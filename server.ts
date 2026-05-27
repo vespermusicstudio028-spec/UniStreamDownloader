@@ -659,6 +659,47 @@ Para obter transcrições completas automáticas em tempo real pela IA do Google
   res.send(transcriptText);
 });
 
+app.get("/api/debug-cobalt", async (req, res) => {
+  const results: any[] = [];
+  const testUrl = "https://www.youtube.com/watch?v=zk4r9LvMTOo";
+  
+  for (const instance of cobaltInstances) {
+    try {
+      const endpoint = instance.endsWith("/api/json") ? instance : `${instance}/`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        },
+        body: JSON.stringify({
+          url: testUrl,
+          videoQuality: "720",
+          downloadMode: "auto"
+        }),
+        signal: (typeof AbortSignal !== "undefined" && AbortSignal.timeout) ? AbortSignal.timeout(3000) : undefined
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        results.push({ instance, status: "ok", data });
+      } else {
+        const text = await response.text();
+        results.push({ instance, status: `error_${response.status}`, error: text.substring(0, 100) });
+      }
+    } catch (err: any) {
+      results.push({ instance, status: "failed", error: err.message });
+    }
+  }
+  
+  res.json({
+    instancesCount: cobaltInstances.length,
+    results
+  });
+});
+
+
 async function startServer() {
   // Vite integration
   if (process.env.NODE_ENV !== "production") {
