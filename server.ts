@@ -422,16 +422,17 @@ app.post("/api/get-stream-url", async (req, res) => {
   const resolvedVideoQuality = isMp3 ? "max" : (["2160", "1440", "1080", "720", "480", "360", "240", "144"].includes(cleanQuality) ? cleanQuality : "1080");
   const resolvedAudioBitrate = isMp3 ? (parseInt(cleanQuality) || 320) : undefined;
 
-  let attempts = 0;
+  let timeoutAttempts = 0;
+  let triedCount = 0;
   for (const instance of cobaltInstances) {
-    if (attempts >= 4) {
-      console.log(`[Proxy Downloader] Atingido limite de 4 tentativas no Cobalt. Acionando fallback...`);
+    if (timeoutAttempts >= 3 || triedCount >= 10) {
+      console.log(`[Proxy Downloader] Atingido limite de tentativas no Cobalt. Acionando fallback...`);
       break;
     }
-    attempts++;
+    triedCount++;
 
     try {
-      console.log(`[Proxy Downloader] Tentando instância Cobalt (${attempts}/4): ${instance} para URL: ${url}`);
+      console.log(`[Proxy Downloader] Tentando instância Cobalt (${triedCount}/10): ${instance} para URL: ${url}`);
       
       const endpoint = instance.endsWith("/api/json") ? instance : `${instance}/`;
       
@@ -458,7 +459,7 @@ app.post("/api/get-stream-url", async (req, res) => {
         const cobaltData = await cobaltResponse.json() as any;
         console.log(`[Proxy Downloader] Resposta do Cobalt para ${instance}:`, cobaltData.status);
         
-        if ((cobaltData.status === "stream" || cobaltData.status === "redirect" || cobaltData.status === "success") && cobaltData.url) {
+        if ((cobaltData.status === "stream" || cobaltData.status === "redirect" || cobaltData.status === "success" || cobaltData.status === "tunnel") && cobaltData.url) {
           res.json({
             status: "success",
             downloadUrl: cobaltData.url
@@ -478,8 +479,11 @@ app.post("/api/get-stream-url", async (req, res) => {
         const errText = await cobaltResponse.text();
         console.warn(`Cobalt retornou erro status ${cobaltResponse.status} em ${instance}:`, errText);
       }
-    } catch (e) {
-      console.warn(`Erro de conexão na instância Cobalt ${instance}:`, e);
+    } catch (e: any) {
+      console.warn(`Erro de conexão na instância Cobalt ${instance}:`, e.message);
+      if (e.name === "TimeoutError" || e.message.includes("aborted") || e.message.includes("timeout")) {
+        timeoutAttempts++;
+      }
     }
   }
 
