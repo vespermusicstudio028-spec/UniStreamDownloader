@@ -1,0 +1,6 @@
+{
+  "name": "UniStream Downloader",
+  "description": "Multi-platform video and audio downloader for YouTube, Instagram, TikTok, Facebook, Kwai, and X. Support MP4 resolutions, MP3 bitrates, and save to a custom folder.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
