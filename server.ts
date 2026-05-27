@@ -459,19 +459,17 @@ app.post("/api/get-stream-url", async (req, res) => {
         console.log(`[Proxy Downloader] Resposta do Cobalt para ${instance}:`, cobaltData.status);
         
         if ((cobaltData.status === "stream" || cobaltData.status === "redirect" || cobaltData.status === "success") && cobaltData.url) {
-          const secureProxyUrl = `/api/proxy-download?url=${encodeURIComponent(cobaltData.url)}&filename=${encodeURIComponent(sanitizedFileName)}&mime=${isMp3 ? 'audio/mpeg' : 'video/mp4'}`;
           res.json({
             status: "success",
-            downloadUrl: secureProxyUrl
+            downloadUrl: cobaltData.url
           });
           return;
         } else if (cobaltData.status === "picker" && Array.isArray(cobaltData.picker) && cobaltData.picker.length > 0) {
           const firstItemUrl = cobaltData.picker[0].url;
           if (firstItemUrl) {
-            const secureProxyUrl = `/api/proxy-download?url=${encodeURIComponent(firstItemUrl)}&filename=${encodeURIComponent(sanitizedFileName)}&mime=${isMp3 ? 'audio/mpeg' : 'video/mp4'}`;
             res.json({
               status: "success",
-              downloadUrl: secureProxyUrl
+              downloadUrl: firstItemUrl
             });
             return;
           }
