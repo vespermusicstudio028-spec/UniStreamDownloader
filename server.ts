@@ -447,11 +447,11 @@ app.post("/api/get-stream-url", async (req, res) => {
           videoQuality: resolvedVideoQuality,
           audioFormat: isMp3 ? "mp3" : "best",
           audioOnly: isMp3,
-          downloadMode: isMp3 ? "audio" : "video",
-          audioBitrate: resolvedAudioBitrate,
-          filenamePattern: "basic"
+          downloadMode: isMp3 ? "audio" : "auto",
+          audioBitrate: isMp3 ? (resolvedAudioBitrate ? String(resolvedAudioBitrate) : "128") : undefined,
+          filenameStyle: "basic"
         }),
-        signal: AbortSignal.timeout(3000) // 3 segundos de limite por instância para evitar timeout do navegador
+        signal: (typeof AbortSignal !== "undefined" && AbortSignal.timeout) ? AbortSignal.timeout(3000) : undefined // 3 segundos de limite por instância para evitar timeout do navegador
       });
 
       if (cobaltResponse.ok) {
