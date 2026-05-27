@@ -1,24 +1,63 @@
-export type Platform = 'youtube' | 'instagram' | 'facebook' | 'tiktok' | 'twitter' | 'kwai' | 'generic';
+// All TypeScript types for UniStream Pro
+export type Platform =
+  | 'youtube'
+  | 'instagram'
+  | 'tiktok'
+  | 'facebook'
+  | 'twitter'
+  | 'kwai'
+  | 'vimeo'
+  | 'reddit'
+  | 'web';
 
-export interface DownloadItem {
+export type DownloadFormat = 'mp4' | 'mp3' | 'txt';
+export type DownloadStatus = 'queued' | 'downloading' | 'converting' | 'finalizing' | 'done' | 'error';
+
+export interface FormatOption {
+  id: string;
+  ext: string;
+  quality: string;
+  resolution?: string;
+  filesize?: number;
+  label: string;
+}
+
+export interface MediaInfo {
+  title: string;
+  uploader: string;
+  duration: number; // seconds
+  thumbnailUrl: string;
+  platform: string;
+  formats: FormatOption[];
+  description?: string;
+}
+
+export interface DownloadJob {
   id: string;
   url: string;
   title: string;
+  uploader: string;
+  thumbnailUrl: string;
   platform: Platform;
-  format: 'mp4' | 'mp3' | 'txt';
-  quality: string; // e.g., '1080p', '720p', '320kbps', '192kbps'
-  status: 'queued' | 'downloading' | 'converting' | 'completed' | 'failed';
-  progress: number; // 0 to 100
-  downloadSpeed: string; // e.g., '4.5 MB/s'
-  eta: string; // e.g., '0:12'
-  fileSize: string; // e.g., '12.4 MB'
-  timestamp: string;
-  savedPath?: string; // e.g., 'UniStream/Videos/my_video.mp4'
+  format: DownloadFormat;
+  quality: string;
+  status: DownloadStatus;
+  progress: number;
+  speed: string;
+  eta: string;
+  message: string;
+  filePath?: string;
+  filename?: string;
+  error?: string;
+  fileSize: string;
+  createdAt: number;
+  isFavorite?: boolean;
 }
 
-export interface LiveMetrics {
-  activeUsersNow: number;
-  downloadsTodayCount: number;
-  totalDataSavedBytes: number; // in bytes
-  averageSpeedMbps: number;
+export interface ToastMessage {
+  id: string;
+  type: 'success' | 'error' | 'info' | 'warning';
+  title: string;
+  body?: string;
+  duration?: number;
 }

@@ -1,0 +1,42 @@
+{
+  "name": "UniStream Downloader Pro",
+  "short_name": "UniStream",
+  "description": "Plataforma premium para baixar vídeos e músicas de YouTube, Instagram, TikTok e mais.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030712",
+  "theme_color": "#06b6d4",
+  "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "categories": ["utilities", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Novo Download",
+      "short_name": "Download",
+      "description": "Iniciar um novo download",
+      "url": "/",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
