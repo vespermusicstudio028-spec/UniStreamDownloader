@@ -443,13 +443,16 @@ app.post("/api/get-stream-url", async (req, res) => {
           "Content-Type": "application/json",
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         },
-        body: JSON.stringify({
+        body: JSON.stringify(isMp3 ? {
+          url: url,
+          downloadMode: "audio",
+          audioFormat: "mp3",
+          audioBitrate: resolvedAudioBitrate ? String(resolvedAudioBitrate) : "128",
+          filenameStyle: "basic"
+        } : {
           url: url,
           videoQuality: resolvedVideoQuality,
-          audioFormat: isMp3 ? "mp3" : "best",
-          audioOnly: isMp3,
-          downloadMode: isMp3 ? "audio" : "auto",
-          audioBitrate: isMp3 ? (resolvedAudioBitrate ? String(resolvedAudioBitrate) : "128") : undefined,
+          downloadMode: "auto",
           filenameStyle: "basic"
         }),
         signal: (typeof AbortSignal !== "undefined" && AbortSignal.timeout) ? AbortSignal.timeout(3000) : undefined // 3 segundos de limite por instância para evitar timeout do navegador
