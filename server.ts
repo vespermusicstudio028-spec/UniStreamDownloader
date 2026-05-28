@@ -9,7 +9,8 @@ import youtubedl from "youtube-dl-exec";
 // Import new modular routes and cleanup utility
 import downloadRouter from "./server/routes/download.js";
 import mp3Router from "./server/routes/mp3.js";
-import { startAutoCleanup } from "./server/utils/cleanup.js";
+import { startAutoCleanup, cleanupFile } from "./server/utils/cleanup.js";
+import { downloadWithYtdlp } from "./server/services/ytdlp.js";
 
 // Public Cobalt instances for high availability
 let cobaltInstances = [
@@ -708,8 +709,65 @@ app.get("/api/transcribe", async (req, res) => {
   let transcriptText = "";
 
   if (client) {
+    let localFilePath = "";
     try {
-      const prompt = `Gere uma transcrição textual inteligente e um resumo profissional para a seguinte mídia:
+      console.log(`[Transcribe Engine] Baixando áudio temporário para transcrição real: ${url}`);
+      const dlResult = await downloadWithYtdlp({
+        url: url,
+        audioOnly: true
+      });
+      localFilePath = dlResult.filePath;
+      console.log(`[Transcribe Engine] Uploading file to Gemini API: ${localFilePath}`);
+
+      // Carrega o áudio temporário no armazenamento seguro do Gemini (armazenado por 48 horas)
+      const fileUpload = await client.files.upload({
+        file: localFilePath
+      });
+      console.log(`[Transcribe Engine] File uploaded to Gemini: ${fileUpload.name}. Starting transcription...`);
+
+      const prompt = `Você é o agente de transcrição inteligente do UniStream Downloader.
+Analise a trilha de áudio fornecida e gere um documento em Português no formato estruturado abaixo:
+
+============= UNISTREAM TRANSCRIPTION SERVICE =============
+- Título da Mídia: ${mediaTitle}
+- Link de Origem: ${url}
+- Canal/Autor: ${mediaAuthor}
+- Método: Transcrição e Resumo Real via IA Google Gemini (Leitura direta do áudio)
+- Data de Processamento: ${new Date().toLocaleDateString('pt-BR')}
+
+============= RESUMO EXECUTIVO DO CONTEÚDO =============
+(Escreva de 2 a 3 parágrafos explicativos resumindo detalhadamente o conteúdo real falado no áudio)
+
+============= TRANSCRIÇÃO DA TRILHA DE ÁUDIO (TIMESTAMPS DO ÁUDIO) =============
+(Gere uma transcrição linha a linha extremamente detalhada e fiel de tudo que foi falado no áudio, utilizando timestamps realistas baseados na fala. Por exemplo:
+[00:00] Fala/Introdução...
+[00:30] Fala...)
+
+============= PRINCIPAIS INSIGHTS & CONCLUSÕES =============
+(Destaques textuais e lições aprendidas)
+
+Retorne apenas o texto limpo formatado conforme as seções acima, sem blocos de código de markdown (sem usar \`\`\`).`;
+
+      const response = await client.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          fileUpload,
+          prompt
+        ]
+      });
+
+      transcriptText = response.text || "";
+
+      // Limpa o arquivo enviado na nuvem do Gemini
+      try {
+        await client.files.delete({ name: fileUpload.name });
+      } catch (e) {
+        console.warn("[Transcribe Engine] Failed to delete temp Gemini file:", e);
+      }
+    } catch (err: any) {
+      console.error("[Transcribe Engine] Real transcription failed, falling back to metadata analysis:", err);
+      try {
+        const promptFallback = `Gere uma transcrição textual inteligente e um resumo profissional para a seguinte mídia:
 URL: ${url}
 Título: ${mediaTitle}
 Autor/Canal: ${mediaAuthor}
@@ -740,15 +798,15 @@ Formate a resposta em texto estruturado simples com as seções:
 
 Retorne apenas o texto estruturado limpo, sem marcações markdown de blocos de código (como \`\`\` ou semelhantes).`;
 
-      const response = await client.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt
-      });
+        const response = await client.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: promptFallback
+        });
 
-      transcriptText = response.text || "";
-    } catch (err) {
-      console.error("Gemini failed to generate transcription:", err);
-      transcriptText = `=== ERRO NA TRANSCRIÇÃO DO UNISTREAM INTERNO ===
+        transcriptText = response.text || "";
+      } catch (fallbackErr) {
+        console.error("Gemini failed completely:", fallbackErr);
+        transcriptText = `=== ERRO NA TRANSCRIÇÃO DO UNISTREAM INTERNO ===
 Não foi possível processar a transcrição com o Gemini devido a restrições temporárias do servidor.
 
 MÍDIA DETECTADA:
@@ -757,6 +815,11 @@ Canal: ${mediaAuthor}
 URL: ${url}
 
 Por favor, tente novamente em alguns instantes.`;
+      }
+    } finally {
+      if (localFilePath) {
+        cleanupFile(localFilePath);
+      }
     }
   } else {
     // Fallback template when offline or Gemini Key is not set yet

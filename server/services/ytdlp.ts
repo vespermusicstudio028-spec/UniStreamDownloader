@@ -33,7 +33,8 @@ export async function downloadWithYtdlp(options: YtdlpDownloadOptions): Promise<
     ? sanitizeFilename(outputFilename)
     : `unistream_${Date.now()}`;
 
-  const outputPath = getTmpPath(`${safeName}.%(ext)s`);
+  getTmpPath('x'); // garante que o diretório tmp existe
+  const outputPath = `tmp/${safeName}.%(ext)s`;
 
   logger.info('yt-dlp', `Iniciando download: ${url} [${audioOnly ? 'áudio' : quality + 'p'}]`);
 
