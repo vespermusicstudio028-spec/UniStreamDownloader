@@ -287,6 +287,107 @@ Retorne APENAS um objeto JSON válido com os seguintes campos (sem blocos de có
   });
 });
 
+// NEW: /api/info — returns schema expected by new frontend (MediaInfo)
+app.post("/api/info", async (req, res) => {
+  const { url: rawUrl } = req.body;
+
+  if (!rawUrl || typeof rawUrl !== "string") {
+    res.status(400).json({ error: "URL é obrigatória." });
+    return;
+  }
+
+  const url = resolveCanonicalYouTubeUrl(rawUrl);
+
+  // Detect platform (pure string matching, instant)
+  function detectPlatform(u: string): string {
+    if (u.includes("youtube.com") || u.includes("youtu.be")) return "YouTube";
+    if (u.includes("instagram.com")) return "Instagram";
+    if (u.includes("tiktok.com")) return "TikTok";
+    if (u.includes("facebook.com") || u.includes("fb.watch")) return "Facebook";
+    if (u.includes("twitter.com") || u.includes("x.com")) return "Twitter/X";
+    if (u.includes("kwai.com")) return "Kwai";
+    if (u.includes("vimeo.com")) return "Vimeo";
+    if (u.includes("reddit.com")) return "Reddit";
+    return "Web";
+  }
+
+  const platform = detectPlatform(url);
+  const isYouTube = url.includes("youtube.com") || url.includes("youtu.be");
+
+  // Helper: fetch with hard timeout (ms) — never hangs forever
+  async function fetchWithTimeout(fetchUrl: string, ms: number): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    try {
+      const r = await fetch(fetchUrl, { signal: controller.signal });
+      clearTimeout(timer);
+      return r;
+    } catch (e) {
+      clearTimeout(timer);
+      throw e;
+    }
+  }
+
+  let title = `Vídeo de ${platform}`;
+  let uploader = "";
+  let thumbnailUrl = "";
+  const duration = 0;
+
+  try {
+    if (isYouTube) {
+      // YouTube oEmbed — fast & authoritative, 3 s timeout max
+      const vidId = new URL(url).searchParams.get("v");
+      const [oembedResult] = await Promise.allSettled([
+        fetchWithTimeout(
+          `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`,
+          3000
+        ).then(r => r.ok ? r.json() : null),
+      ]);
+
+      if (oembedResult.status === "fulfilled" && oembedResult.value?.title) {
+        const oe = oembedResult.value;
+        title    = oe.title       || title;
+        uploader = oe.author_name || uploader;
+        // Always use direct HQ thumbnail (faster than oe.thumbnail_url)
+        thumbnailUrl = vidId
+          ? `https://i.ytimg.com/vi/${vidId}/hqdefault.jpg`
+          : oe.thumbnail_url || "";
+      } else if (vidId) {
+        // oEmbed failed but we still have the video ID — provide thumbnail
+        thumbnailUrl = `https://i.ytimg.com/vi/${vidId}/hqdefault.jpg`;
+      }
+    } else {
+      // Non-YouTube: fire noembed + scraper IN PARALLEL — take whichever wins first
+      const [noembedResult, scrapedResult] = await Promise.allSettled([
+        fetchWithTimeout(`https://noembed.com/embed?url=${encodeURIComponent(url)}`, 3000)
+          .then(r => r.ok ? r.json() : null),
+        fetchRealMetadata(url),
+      ]);
+
+      if (noembedResult.status === "fulfilled" && noembedResult.value?.title) {
+        const oe = noembedResult.value;
+        title        = oe.title        || title;
+        uploader     = oe.author_name  || uploader;
+        thumbnailUrl = oe.thumbnail_url || "";
+      } else if (scrapedResult.status === "fulfilled" && scrapedResult.value) {
+        title    = scrapedResult.value.title  || title;
+        uploader = scrapedResult.value.author || uploader;
+      }
+    }
+  } catch {
+    // Silently use defaults — never block the response
+  }
+
+  const formats = [
+    { id: "1080", ext: "mp4", quality: "1080p", label: "1080p Full HD" },
+    { id: "720",  ext: "mp4", quality: "720p",  label: "720p HD" },
+    { id: "480",  ext: "mp4", quality: "480p",  label: "480p" },
+    { id: "360",  ext: "mp4", quality: "360p",  label: "360p" },
+  ];
+
+  res.json({ title, uploader, duration, thumbnailUrl, platform, formats });
+});
+
 // Helper to extract quality number for Cobalt
 function mapQuality(qualityStr: string): string {
   if (!qualityStr) return "max";
