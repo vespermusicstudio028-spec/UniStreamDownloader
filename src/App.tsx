@@ -226,11 +226,19 @@ export default function App() {
       return;
     }
 
+    let url = job.filePath.startsWith('http') ? job.filePath : `${BASE_URL}${job.filePath}`;
+
+    // Force immediate download of external links by routing them through proxy-download
+    if (job.filePath.startsWith('http') && 
+        !job.filePath.includes(window.location.hostname) && 
+        !job.filePath.includes('unistreamdownloader.onrender.com')) {
+      const filename = job.filename || `${job.title}.${job.format}`;
+      url = `${BASE_URL}/api/proxy-download?url=${encodeURIComponent(job.filePath)}&filename=${encodeURIComponent(filename)}`;
+    }
+
     const a = document.createElement('a');
-    const url = job.filePath.startsWith('http') ? job.filePath : `${BASE_URL}${job.filePath}`;
     a.href = url;
     a.download = job.filename || `${job.title}.${job.format}`;
-    a.target = '_blank';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
