@@ -1,6 +1,6 @@
 import { Platform, MediaInfo, DownloadFormat } from '../types';
 
-const BASE_URL = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+export const BASE_URL = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
   ? 'https://unistreamdownloader.onrender.com'
   : '';
 

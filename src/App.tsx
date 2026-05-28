@@ -5,7 +5,7 @@ import './index.css';
 import { DownloadJob, DownloadFormat, MediaInfo } from './types';
 import { useToast } from './hooks/useToast';
 import { useFavorites } from './hooks/useFavorites';
-import api from './services/api';
+import api, { BASE_URL } from './services/api';
 
 import HeroSection from './components/HeroSection';
 import UrlInput from './components/UrlInput';
@@ -171,7 +171,7 @@ export default function App() {
     }
 
     const a = document.createElement('a');
-    const url = job.filePath.startsWith('http') ? job.filePath : job.filePath;
+    const url = job.filePath.startsWith('http') ? job.filePath : `${BASE_URL}${job.filePath}`;
     a.href = url;
     a.download = job.filename || `${job.title}.${job.format}`;
     a.target = '_blank';
