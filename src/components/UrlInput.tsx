@@ -36,14 +36,54 @@ const PLATFORM_COLORS: Record<string, string> = {
   reddit: '#ff4500',
 };
 
+function formatAndValidateUrl(input: string): string | null {
+  const clean = input.trim();
+  if (!clean) return null;
+
+  // 1. If it's already a valid http/https URL, return it
+  try {
+    const u = new URL(clean);
+    if (u.protocol === 'http:' || u.protocol === 'https:') {
+      return clean;
+    }
+  } catch {}
+
+  // 2. Handle YouTube video ID (11 chars, e.g. "PMn3HWONYDM")
+  const ytIdRegex = /^[a-zA-Z0-9_-]{11}$/;
+  if (ytIdRegex.test(clean)) {
+    return `https://www.youtube.com/watch?v=${clean}`;
+  }
+
+  // 3. Handle query string only pasted from YouTube (e.g. "v=PMn3HWONYDM...")
+  if (clean.startsWith('v=')) {
+    const match = clean.match(/v=([a-zA-Z0-9_-]{11})/);
+    if (match) {
+      return `https://www.youtube.com/watch?v=${match[1]}`;
+    }
+  }
+
+  // 4. Handle domains without protocol (e.g. "youtube.com/...", "x.com/...", etc.)
+  const domainRegex = /^(youtube\.com|youtu\.be|instagram\.com|tiktok\.com|facebook\.com|fb\.watch|twitter\.com|x\.com|kwai\.com|vimeo\.com|reddit\.com)(\/.*)?$/i;
+  if (domainRegex.test(clean)) {
+    return `https://${clean}`;
+  }
+
+  // 5. Handle www. domains without protocol
+  if (clean.toLowerCase().startsWith('www.')) {
+    return `https://${clean}`;
+  }
+
+  return null;
+}
+
 function detectPlatformKey(url: string): string {
-  const lower = url.toLowerCase();
+  const formatted = formatAndValidateUrl(url) || url;
+  const lower = formatted.toLowerCase();
   if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'youtube';
   if (lower.includes('instagram.com')) return 'instagram';
   if (lower.includes('tiktok.com')) return 'tiktok';
   if (lower.includes('facebook.com') || lower.includes('fb.watch')) return 'facebook';
-  if (lower.includes('twitter.com')) return 'twitter';
-  if (lower.includes('x.com')) return 'x.com';
+  if (lower.includes('twitter.com') || lower.includes('x.com')) return 'x.com';
   if (lower.includes('kwai.com')) return 'kwai';
   if (lower.includes('vimeo.com')) return 'vimeo';
   if (lower.includes('reddit.com')) return 'reddit';
@@ -51,12 +91,7 @@ function detectPlatformKey(url: string): string {
 }
 
 function isValidUrl(str: string): boolean {
-  try {
-    const u = new URL(str.trim());
-    return u.protocol === 'http:' || u.protocol === 'https:';
-  } catch {
-    return false;
-  }
+  return formatAndValidateUrl(str) !== null;
 }
 
 export default function UrlInput({ onInfoLoaded, onError, loading, setLoading }: UrlInputProps) {
@@ -68,16 +103,17 @@ export default function UrlInput({ onInfoLoaded, onError, loading, setLoading }:
 
   // Core analyze function
   const analyze = useCallback(async (targetUrl: string) => {
-    const clean = targetUrl.trim();
-    if (!clean || !isValidUrl(clean)) return;
+    const formatted = formatAndValidateUrl(targetUrl);
+    if (!formatted) return;
     if (loading) return;
 
     setLoading(true);
     setAnalyzed(false);
     try {
-      const info = await api.info(clean);
+      const info = await api.info(formatted);
       setAnalyzed(true);
-      onInfoLoaded(clean, info);
+      setUrl(formatted);
+      onInfoLoaded(formatted, info);
     } catch (err: any) {
       onError(err.message || 'Não foi possível analisar este link. Verifique se é público e tente novamente.');
     } finally {

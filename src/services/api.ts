@@ -1,6 +1,8 @@
 import { Platform, MediaInfo, DownloadFormat } from '../types';
 
-const BASE_URL = '';
+const BASE_URL = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+  ? 'https://unistreamdownloader.onrender.com'
+  : '';
 
 export const api = {
   /** POST /api/info — Extract metadata for a URL */
@@ -88,7 +90,7 @@ export const api = {
   /** SSE subscription for job progress */
   subscribeProgress(jobId: string, type: 'download' | 'mp3' = 'download'): EventSource {
     const path = type === 'mp3' ? `/api/mp3/progress/${jobId}` : `/api/download/progress/${jobId}`;
-    return new EventSource(path);
+    return new EventSource(`${BASE_URL}${path}`);
   },
 };
 
