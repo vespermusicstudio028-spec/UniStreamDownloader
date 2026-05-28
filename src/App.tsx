@@ -226,26 +226,20 @@ export default function App() {
       return;
     }
 
-    let url = job.filePath.startsWith('http') ? job.filePath : `${BASE_URL}${job.filePath}`;
-    let isProxied = false;
+    let url: string;
 
-    // Force immediate download of external MP3 links by routing them through proxy-download
-    // We avoid proxying MP4 files because video files are often too large for Render's request limits
-    if (job.format === 'mp3' &&
-        job.filePath.startsWith('http') && 
-        !job.filePath.includes(window.location.hostname) && 
-        !job.filePath.includes('unistreamdownloader.onrender.com')) {
-      const filename = job.filename || `${job.title}.${job.format}`;
-      url = `${BASE_URL}/api/proxy-download?url=${encodeURIComponent(job.filePath)}&filename=${encodeURIComponent(filename)}`;
-      isProxied = true;
+    if (job.format === 'mp3' && job.filePath.startsWith('http')) {
+      // MP3: route through proxy to force "Save file" dialog instead of browser audio player
+      const filename = job.filename || `${job.title}.mp3`;
+      url = `${BASE_URL}/api/proxy-download?url=${encodeURIComponent(job.filePath)}&filename=${encodeURIComponent(filename)}&mime=${encodeURIComponent('audio/mpeg')}`;
+    } else {
+      // MP4 / txt / local paths: use the URL directly (Cobalt URLs work fine for video)
+      url = job.filePath.startsWith('http') ? job.filePath : `${BASE_URL}${job.filePath}`;
     }
 
     const a = document.createElement('a');
     a.href = url;
     a.download = job.filename || `${job.title}.${job.format}`;
-    if (!isProxied) {
-      a.target = '_blank';
-    }
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
