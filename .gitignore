@@ -8,3 +8,5 @@ coverage/
 !.env.example
 desktop.ini
 *.mp4
+
+.vercel
