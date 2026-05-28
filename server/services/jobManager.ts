@@ -67,6 +67,7 @@ function sendEvent(res: Response, job: Job) {
     speed: job.speed,
     eta: job.eta,
     message: job.message,
+    filePath: job.filePath,   // ← necessário para o auto-download no frontend
     filename: job.filename,
     error: job.error,
   });

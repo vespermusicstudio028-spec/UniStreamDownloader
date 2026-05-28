@@ -26,7 +26,6 @@ const FORMAT_ICONS: Record<string, React.ReactNode> = {
 
 export default function DownloadCard({ job, onUpdate, onSave }: DownloadCardProps) {
   const [confetti, setConfetti] = useState(false);
-  const [autoDownloaded, setAutoDownloaded] = useState(false);
   const isDone = job.status === 'done';
   const isError = job.status === 'error';
   const isActive = !isDone && !isError;
@@ -54,18 +53,6 @@ export default function DownloadCard({ job, onUpdate, onSave }: DownloadCardProp
       if (data.status === 'done' && !confetti) {
         setConfetti(true);
         setTimeout(() => setConfetti(false), 2000);
-
-        // ── Auto-download: dispara o download automaticamente assim que pronto ──
-        if (!autoDownloaded && data.filePath) {
-          setAutoDownloaded(true);
-          const a = document.createElement('a');
-          a.href = data.filePath;
-          a.download = data.filename || `unistream.${job.format}`;
-          a.target = '_blank';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-        }
       }
     },
   });

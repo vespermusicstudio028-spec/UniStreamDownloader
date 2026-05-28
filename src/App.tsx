@@ -154,10 +154,22 @@ export default function App() {
     setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...updates } : j)));
 
     if (updates.status === 'done') {
-      toast.success('✅ Download concluído!', 'Clique em Salvar para baixar o arquivo.');
+      toast.success('✅ Download concluído!', 'Baixando arquivo automaticamente...');
+
+      // Auto-download: dispara o download direto, sem precisar clicar em Salvar
+      if (updates.filePath) {
+        const a = document.createElement('a');
+        a.href = updates.filePath;
+        a.download = updates.filename || `unistream`;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('✅ UniStream — Download concluído!', {
-          body: 'Seu arquivo está pronto para salvar.',
+          body: 'Seu arquivo está sendo baixado.',
           icon: '/favicon.ico',
         });
       }
