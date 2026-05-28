@@ -48,11 +48,21 @@ export default function DownloadCard({ job, onUpdate, onSave }: DownloadCardProp
       if (data.filePath) updates.filePath = data.filePath;
       if (data.filename) updates.filename = data.filename;
       if (data.error) updates.error = data.error;
+      
       onUpdate(job.id, updates);
 
-      if (data.status === 'done' && !confetti) {
-        setConfetti(true);
-        setTimeout(() => setConfetti(false), 2000);
+      if (job.status !== 'done' && data.status === 'done') {
+        if (!confetti) {
+          setConfetti(true);
+          setTimeout(() => setConfetti(false), 2000);
+        }
+        
+        // Auto trigger device save/download
+        const completedJob = {
+          ...job,
+          ...updates,
+        };
+        onSave(completedJob);
       }
     },
   });
