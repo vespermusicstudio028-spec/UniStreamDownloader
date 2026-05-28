@@ -5,7 +5,7 @@ import './index.css';
 import { DownloadJob, DownloadFormat, MediaInfo } from './types';
 import { useToast } from './hooks/useToast';
 import { useFavorites } from './hooks/useFavorites';
-import api, { BASE_URL } from './services/api';
+import api from './services/api';
 
 import HeroSection from './components/HeroSection';
 import UrlInput from './components/UrlInput';
@@ -73,70 +73,16 @@ export default function App() {
 
     // Handle TXT (AI transcription)
     if (params.format === 'txt') {
-      const jobId = crypto.randomUUID();
-      const newJob: DownloadJob = {
-        id: jobId,
-        url: currentUrl,
-        title: currentInfo.title,
-        uploader: currentInfo.uploader,
-        thumbnailUrl: currentInfo.thumbnailUrl,
-        platform: currentInfo.platform.toLowerCase() as any,
-        format: 'txt',
-        quality: '',
-        status: 'downloading',
-        progress: 30,
-        speed: '',
-        eta: '',
-        message: '✍️ Transcrevendo com IA...',
-        fileSize: '',
-        createdAt: Date.now(),
-      };
-
-      setJobs((prev) => [newJob, ...prev]);
-      toast.info('⬇️ Transcrição iniciada!', 'O texto está sendo gerado pela IA.');
-
       try {
         const result = await api.transcribe(currentUrl, sanitizedTitle);
-        const fetchUrl = result.downloadUrl.startsWith('http') ? result.downloadUrl : `${BASE_URL}${result.downloadUrl}`;
-        const resp = await fetch(fetchUrl);
-        const text = await resp.text();
-        
-        const bytes = new Blob([text]).size;
-        const sizeStr = bytes > 1024 * 1024 
-          ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` 
-          : `${(bytes / 1024).toFixed(0)} KB`;
-
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain; charset=utf-8' }));
+        a.href = result.downloadUrl;
         a.download = `${sanitizedTitle}.txt`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-
-        setJobs((prev) =>
-          prev.map((j) =>
-            j.id === jobId
-              ? {
-                  ...j,
-                  status: 'done',
-                  progress: 100,
-                  message: '✅ Transcrição concluída!',
-                  fileSize: sizeStr,
-                  filePath: fetchUrl,
-                  filename: `${sanitizedTitle}.txt`,
-                }
-              : j
-          )
-        );
         toast.success('📝 Transcrição gerada!', 'Arquivo de texto baixado com sucesso.');
       } catch (err: any) {
-        setJobs((prev) =>
-          prev.map((j) =>
-            j.id === jobId
-              ? { ...j, status: 'error', error: err.message, message: '❌ ' + err.message }
-              : j
-          )
-        );
         toast.error('Falha na transcrição', err.message);
       } finally {
         setDownloading(false);
@@ -176,7 +122,6 @@ export default function App() {
           bitrate: params.bitrate,
           title: sanitizedTitle,
           artist: currentInfo.uploader,
-          duration: currentInfo.duration,
         });
       } else {
         result = await api.startDownload({
@@ -184,7 +129,6 @@ export default function App() {
           quality: qualityNum,
           format: params.format,
           title: sanitizedTitle,
-          duration: currentInfo.duration,
         });
       }
 
@@ -226,20 +170,11 @@ export default function App() {
       return;
     }
 
-    let url: string;
-
-    if (job.format === 'mp3' && job.filePath.startsWith('http')) {
-      // MP3: route through proxy to force "Save file" dialog instead of browser audio player
-      const filename = job.filename || `${job.title}.mp3`;
-      url = `${BASE_URL}/api/proxy-download?url=${encodeURIComponent(job.filePath)}&filename=${encodeURIComponent(filename)}&mime=${encodeURIComponent('audio/mpeg')}`;
-    } else {
-      // MP4 / txt / local paths: use the URL directly (Cobalt URLs work fine for video)
-      url = job.filePath.startsWith('http') ? job.filePath : `${BASE_URL}${job.filePath}`;
-    }
-
     const a = document.createElement('a');
+    const url = job.filePath.startsWith('http') ? job.filePath : job.filePath;
     a.href = url;
     a.download = job.filename || `${job.title}.${job.format}`;
+    a.target = '_blank';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

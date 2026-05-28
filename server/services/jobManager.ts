@@ -13,7 +13,6 @@ export interface Job {
   filePath?: string;
   filename?: string;
   error?: string;
-  fileSize?: string;
   createdAt: number;
   clients: Set<Response>;
 }
@@ -70,7 +69,6 @@ function sendEvent(res: Response, job: Job) {
     message: job.message,
     filename: job.filename,
     error: job.error,
-    filePath: job.filePath,
   });
   res.write(`data: ${data}\n\n`);
 }

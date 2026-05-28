@@ -26,6 +26,7 @@ const FORMAT_ICONS: Record<string, React.ReactNode> = {
 
 export default function DownloadCard({ job, onUpdate, onSave }: DownloadCardProps) {
   const [confetti, setConfetti] = useState(false);
+  const [autoDownloaded, setAutoDownloaded] = useState(false);
   const isDone = job.status === 'done';
   const isError = job.status === 'error';
   const isActive = !isDone && !isError;
@@ -48,22 +49,23 @@ export default function DownloadCard({ job, onUpdate, onSave }: DownloadCardProp
       if (data.filePath) updates.filePath = data.filePath;
       if (data.filename) updates.filename = data.filename;
       if (data.error) updates.error = data.error;
-      if (data.fileSize) updates.fileSize = data.fileSize;
-      
       onUpdate(job.id, updates);
 
-      if (job.status !== 'done' && data.status === 'done') {
-        if (!confetti) {
-          setConfetti(true);
-          setTimeout(() => setConfetti(false), 2000);
+      if (data.status === 'done' && !confetti) {
+        setConfetti(true);
+        setTimeout(() => setConfetti(false), 2000);
+
+        // ── Auto-download: dispara o download automaticamente assim que pronto ──
+        if (!autoDownloaded && data.filePath) {
+          setAutoDownloaded(true);
+          const a = document.createElement('a');
+          a.href = data.filePath;
+          a.download = data.filename || `unistream.${job.format}`;
+          a.target = '_blank';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
         }
-        
-        // Auto trigger device save/download
-        const completedJob = {
-          ...job,
-          ...updates,
-        };
-        onSave(completedJob);
       }
     },
   });
@@ -153,7 +155,6 @@ export default function DownloadCard({ job, onUpdate, onSave }: DownloadCardProp
               {FORMAT_ICONS[job.format]}
               {job.format.toUpperCase()}
               {job.quality ? ` ${job.quality.split('p')[0]}p` : ''}
-              {job.fileSize ? ` | ${job.fileSize}` : ''}
             </span>
           </div>
 
@@ -198,6 +199,7 @@ export default function DownloadCard({ job, onUpdate, onSave }: DownloadCardProp
                   onClick={() => onSave(job)}
                   className="btn btn-primary btn-sm"
                   style={{ gap: 4, fontSize: '0.78rem' }}
+                  title="Baixar novamente"
                 >
                   <Download size={12} />
                   Salvar

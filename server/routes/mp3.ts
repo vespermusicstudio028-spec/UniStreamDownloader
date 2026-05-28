@@ -7,10 +7,10 @@ import { logger } from '../utils/logger.js';
 const router = Router();
 
 // POST /api/mp3
-// Body: { url, bitrate (128|192|256|320), title, artist, duration }
+// Body: { url, bitrate (128|192|256|320), title, artist }
 // Returns: { jobId }
 router.post('/', async (req, res) => {
-  const { url, bitrate = 128, title = 'audio', artist = '', duration = 0 } = req.body;
+  const { url, bitrate = 128, title = 'audio', artist = '' } = req.body;
 
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: 'URL é obrigatória.' });
@@ -21,7 +21,7 @@ router.post('/', async (req, res) => {
 
   res.json({ jobId });
 
-  processMp3(jobId, url, Number(bitrate), title, artist, Number(duration)).catch((err) => {
+  processMp3(jobId, url, Number(bitrate), title, artist).catch((err) => {
     logger.error('Route/mp3', `Job ${jobId} falhou`, { error: err.message });
     updateJob(jobId, {
       status: 'error',
@@ -31,20 +31,12 @@ router.post('/', async (req, res) => {
   });
 });
 
-async function processMp3(jobId: string, url: string, bitrate: number, title: string, artist: string, duration: number = 0) {
+async function processMp3(jobId: string, url: string, bitrate: number, title: string, artist: string) {
   const sanitizedTitle = title.replace(/[<>:"/\\|?*]/g, '').substring(0, 80).trim() || 'audio';
   const validBitrates = [128, 192, 256, 320];
   const safeBitrate = validBitrates.includes(bitrate) ? bitrate : 128;
 
   updateJob(jobId, { status: 'downloading', progress: 10, message: '🎵 Buscando link de áudio...' });
-
-  // Estimate size first
-  let sizeStr = '';
-  if (duration > 0) {
-    const sizeMb = (duration * safeBitrate * 1000) / (8 * 1024 * 1024);
-    sizeStr = sizeMb.toFixed(1) + ' MB';
-    updateJob(jobId, { fileSize: sizeStr });
-  }
 
   // Try Cobalt for MP3
   const cobaltResult = await getCobaltDownloadUrl(url, {
@@ -53,29 +45,14 @@ async function processMp3(jobId: string, url: string, bitrate: number, title: st
   });
 
   if (cobaltResult) {
-    // Try to get actual size via HEAD request
-    try {
-      const headResp = await fetch(cobaltResult.url, { method: 'HEAD', signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(2000) : undefined });
-      const len = headResp.headers.get('content-length');
-      if (len) {
-        const bytes = parseInt(len);
-        if (!isNaN(bytes) && bytes > 0) {
-          sizeStr = (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-        }
-      }
-    } catch (e) {
-      // Keep estimation
-    }
-
     updateJob(jobId, {
       status: 'done',
       progress: 100,
       message: '✅ MP3 pronto!',
       filePath: cobaltResult.url,
       filename: cobaltResult.filename || `${sanitizedTitle}.mp3`,
-      fileSize: sizeStr,
     });
-    logger.info('Route/mp3', `Job ${jobId} concluído via Cobalt. Tamanho: ${sizeStr}`);
+    logger.info('Route/mp3', `Job ${jobId} concluído via Cobalt.`);
     return;
   }
 
@@ -88,7 +65,6 @@ async function processMp3(jobId: string, url: string, bitrate: number, title: st
       message: '✅ MP3 pronto!',
       filePath: streamUrl,
       filename: `${sanitizedTitle}.mp3`,
-      fileSize: sizeStr,
     });
     return;
   }

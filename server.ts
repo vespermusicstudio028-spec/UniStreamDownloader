@@ -5,7 +5,6 @@ import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import ytdl from "@distube/ytdl-core";
 import youtubedl from "youtube-dl-exec";
-import { Readable } from "stream";
 
 // Import new modular routes and cleanup utility
 import downloadRouter from "./server/routes/download.js";
@@ -640,14 +639,9 @@ app.get("/api/proxy-download", async (req, res) => {
   }
 
   try {
-    const response = await fetch(fileUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "*/*",
-      }
-    });
+    const response = await fetch(fileUrl);
     if (!response.ok) {
-      throw new Error(`Servidor remoto respondeu com status: ${response.status}`);
+      throw new Error(`Servidor remoto respondeu com status: ${response.statusText}`);
     }
 
     const defaultContentType = fileUrl.includes(".mp3") || (filename as string).endsWith(".mp3") ? "audio/mpeg" : "video/mp4";
@@ -662,7 +656,19 @@ app.get("/api/proxy-download", async (req, res) => {
     }
 
     if (response.body) {
-      Readable.fromWeb(response.body as any).pipe(res);
+      // @ts-ignore
+      if (typeof response.body.pipe === "function") {
+        // @ts-ignore
+        response.body.pipe(res);
+      } else {
+        const reader = (response.body as any).getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(value);
+        }
+        res.end();
+      }
     } else {
       res.status(500).send("Corpo da resposta remota está vazio.");
     }

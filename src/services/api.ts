@@ -1,6 +1,6 @@
 import { Platform, MediaInfo, DownloadFormat } from '../types';
 
-export const BASE_URL = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+const BASE_URL = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
   ? 'https://unistreamdownloader.onrender.com'
   : '';
 
@@ -25,7 +25,6 @@ export const api = {
     quality: string;
     format: string;
     title: string;
-    duration?: number;
   }): Promise<{ jobId: string }> {
     const res = await fetch(`${BASE_URL}/api/download`, {
       method: 'POST',
@@ -45,7 +44,6 @@ export const api = {
     bitrate: number;
     title: string;
     artist?: string;
-    duration?: number;
   }): Promise<{ jobId: string }> {
     const res = await fetch(`${BASE_URL}/api/mp3`, {
       method: 'POST',
