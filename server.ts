@@ -6,6 +6,11 @@ import { createServer as createViteServer } from "vite";
 import ytdl from "@distube/ytdl-core";
 import youtubedl from "youtube-dl-exec";
 
+// Import new modular routes and cleanup utility
+import downloadRouter from "./server/routes/download.js";
+import mp3Router from "./server/routes/mp3.js";
+import { startAutoCleanup } from "./server/utils/cleanup.js";
+
 // Public Cobalt instances for high availability
 let cobaltInstances = [
   "https://api.qwkuns.me",
@@ -67,6 +72,10 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+
+// Mount modular download and mp3 routes
+app.use("/api/download", downloadRouter);
+app.use("/api/mp3", mp3Router);
 
 // Initialize Gemini API client lazily to ensure no startup crashes
 let ai: GoogleGenAI | null = null;
@@ -174,8 +183,7 @@ async function fetchRealMetadata(urlStr: string) {
   return null;
 }
 
-// REST api route to parse URL context using AI
-app.post("/api/info",async(req,res)=>{try{const{getMediaInfo}=await import("./server/services/metadata.js");res.json(await getMediaInfo(req.body.url))}catch(err:any){res.status(500).json({error:err.message})}});
+
 app.post("/api/parse-url", async (req, res) => {
   const { url: rawUrl } = req.body;
 
@@ -822,6 +830,9 @@ app.get("/api/debug-cobalt", async (req, res) => {
 
 
 async function startServer() {
+  // Start temporary files auto-cleanup
+  startAutoCleanup();
+
   // Vite integration
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
