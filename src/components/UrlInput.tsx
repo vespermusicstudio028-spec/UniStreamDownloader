@@ -97,7 +97,7 @@ export default function UrlInput({ onInfoLoaded, onError, loading, setLoading }:
     if (isValidUrl(val)) {
       debounceRef.current = setTimeout(() => {
         analyze(val);
-      }, 800);
+      }, 300);
     }
   };
 
