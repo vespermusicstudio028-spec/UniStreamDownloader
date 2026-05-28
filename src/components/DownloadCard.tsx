@@ -48,6 +48,7 @@ export default function DownloadCard({ job, onUpdate, onSave }: DownloadCardProp
       if (data.filePath) updates.filePath = data.filePath;
       if (data.filename) updates.filename = data.filename;
       if (data.error) updates.error = data.error;
+      if (data.fileSize) updates.fileSize = data.fileSize;
       
       onUpdate(job.id, updates);
 
@@ -152,6 +153,7 @@ export default function DownloadCard({ job, onUpdate, onSave }: DownloadCardProp
               {FORMAT_ICONS[job.format]}
               {job.format.toUpperCase()}
               {job.quality ? ` ${job.quality.split('p')[0]}p` : ''}
+              {job.fileSize ? ` | ${job.fileSize}` : ''}
             </span>
           </div>
 

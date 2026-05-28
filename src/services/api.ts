@@ -25,6 +25,7 @@ export const api = {
     quality: string;
     format: string;
     title: string;
+    duration?: number;
   }): Promise<{ jobId: string }> {
     const res = await fetch(`${BASE_URL}/api/download`, {
       method: 'POST',
@@ -44,6 +45,7 @@ export const api = {
     bitrate: number;
     title: string;
     artist?: string;
+    duration?: number;
   }): Promise<{ jobId: string }> {
     const res = await fetch(`${BASE_URL}/api/mp3`, {
       method: 'POST',

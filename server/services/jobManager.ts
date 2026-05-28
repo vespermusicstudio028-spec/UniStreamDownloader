@@ -13,6 +13,7 @@ export interface Job {
   filePath?: string;
   filename?: string;
   error?: string;
+  fileSize?: string;
   createdAt: number;
   clients: Set<Response>;
 }

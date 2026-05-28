@@ -10,23 +10,23 @@ import { logger } from '../utils/logger.js';
 const router = Router();
 
 // POST /api/download
-// Body: { url, quality, format, title }
+// Body: { url, quality, format, title, duration }
 // Returns: { jobId }
 router.post('/', async (req, res) => {
-  const { url, quality = '1080', format = 'mp4', title = 'video' } = req.body;
+  const { url, quality = '1080', format = 'mp4', title = 'video', duration = 0 } = req.body;
 
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: 'URL é obrigatória.' });
   }
 
   const jobId = crypto.randomUUID();
-  const job = createJob(jobId);
+  createJob(jobId);
 
   // Respond immediately with jobId
   res.json({ jobId });
 
   // Process in background
-  processDownload(jobId, url, quality, format, title).catch((err) => {
+  processDownload(jobId, url, quality, format, title, Number(duration)).catch((err) => {
     logger.error('Route/download', `Job ${jobId} falhou`, { error: err.message });
     updateJob(jobId, {
       status: 'error',
@@ -36,11 +36,24 @@ router.post('/', async (req, res) => {
   });
 });
 
-async function processDownload(jobId: string, url: string, quality: string, format: string, title: string) {
+async function processDownload(jobId: string, url: string, quality: string, format: string, title: string, duration: number = 0) {
   const cleanQuality = quality.replace(/[^0-9]/g, '') || '1080';
   const sanitizedTitle = title.replace(/[<>:"/\\|?*]/g, '').substring(0, 80).trim() || 'video';
 
   updateJob(jobId, { status: 'downloading', progress: 5, message: '🔍 Buscando link de download...' });
+
+  // Estimate size first
+  let sizeStr = '';
+  if (duration > 0) {
+    let mbPerSec = 0.5;
+    const q = parseInt(cleanQuality) || 1080;
+    if (q >= 1080) mbPerSec = 1.5;
+    else if (q >= 720) mbPerSec = 0.9;
+    else if (q >= 480) mbPerSec = 0.5;
+    else mbPerSec = 0.25;
+    sizeStr = (duration * mbPerSec).toFixed(1) + ' MB';
+    updateJob(jobId, { fileSize: sizeStr });
+  }
 
   // Try Cobalt first (fast path)
   const cobaltResult = await getCobaltDownloadUrl(url, {
@@ -49,14 +62,29 @@ async function processDownload(jobId: string, url: string, quality: string, form
   });
 
   if (cobaltResult) {
+    // Try to get actual size via HEAD request
+    try {
+      const headResp = await fetch(cobaltResult.url, { method: 'HEAD', signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(2000) : undefined });
+      const len = headResp.headers.get('content-length');
+      if (len) {
+        const bytes = parseInt(len);
+        if (!isNaN(bytes) && bytes > 0) {
+          sizeStr = (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+      }
+    } catch (e) {
+      // Keep estimation
+    }
+
     updateJob(jobId, {
       status: 'done',
       progress: 100,
       message: '✅ Pronto para salvar!',
       filePath: cobaltResult.url, // external URL
       filename: cobaltResult.filename || `${sanitizedTitle}_${cleanQuality}p.mp4`,
+      fileSize: sizeStr,
     });
-    logger.info('Route/download', `Job ${jobId} concluído via Cobalt.`);
+    logger.info('Route/download', `Job ${jobId} concluído via Cobalt. Tamanho: ${sizeStr}`);
     return;
   }
 
@@ -70,6 +98,7 @@ async function processDownload(jobId: string, url: string, quality: string, form
       message: '✅ Pronto para salvar!',
       filePath: streamUrl,
       filename: `${sanitizedTitle}_${cleanQuality}p.mp4`,
+      fileSize: sizeStr,
     });
     return;
   }

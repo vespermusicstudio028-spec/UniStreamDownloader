@@ -73,16 +73,70 @@ export default function App() {
 
     // Handle TXT (AI transcription)
     if (params.format === 'txt') {
+      const jobId = crypto.randomUUID();
+      const newJob: DownloadJob = {
+        id: jobId,
+        url: currentUrl,
+        title: currentInfo.title,
+        uploader: currentInfo.uploader,
+        thumbnailUrl: currentInfo.thumbnailUrl,
+        platform: currentInfo.platform.toLowerCase() as any,
+        format: 'txt',
+        quality: '',
+        status: 'downloading',
+        progress: 30,
+        speed: '',
+        eta: '',
+        message: '✍️ Transcrevendo com IA...',
+        fileSize: '',
+        createdAt: Date.now(),
+      };
+
+      setJobs((prev) => [newJob, ...prev]);
+      toast.info('⬇️ Transcrição iniciada!', 'O texto está sendo gerado pela IA.');
+
       try {
         const result = await api.transcribe(currentUrl, sanitizedTitle);
+        const fetchUrl = result.downloadUrl.startsWith('http') ? result.downloadUrl : `${BASE_URL}${result.downloadUrl}`;
+        const resp = await fetch(fetchUrl);
+        const text = await resp.text();
+        
+        const bytes = new Blob([text]).size;
+        const sizeStr = bytes > 1024 * 1024 
+          ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` 
+          : `${(bytes / 1024).toFixed(0)} KB`;
+
         const a = document.createElement('a');
-        a.href = result.downloadUrl;
+        a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain; charset=utf-8' }));
         a.download = `${sanitizedTitle}.txt`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.id === jobId
+              ? {
+                  ...j,
+                  status: 'done',
+                  progress: 100,
+                  message: '✅ Transcrição concluída!',
+                  fileSize: sizeStr,
+                  filePath: fetchUrl,
+                  filename: `${sanitizedTitle}.txt`,
+                }
+              : j
+          )
+        );
         toast.success('📝 Transcrição gerada!', 'Arquivo de texto baixado com sucesso.');
       } catch (err: any) {
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.id === jobId
+              ? { ...j, status: 'error', error: err.message, message: '❌ ' + err.message }
+              : j
+          )
+        );
         toast.error('Falha na transcrição', err.message);
       } finally {
         setDownloading(false);
@@ -122,6 +176,7 @@ export default function App() {
           bitrate: params.bitrate,
           title: sanitizedTitle,
           artist: currentInfo.uploader,
+          duration: currentInfo.duration,
         });
       } else {
         result = await api.startDownload({
@@ -129,6 +184,7 @@ export default function App() {
           quality: qualityNum,
           format: params.format,
           title: sanitizedTitle,
+          duration: currentInfo.duration,
         });
       }
 
