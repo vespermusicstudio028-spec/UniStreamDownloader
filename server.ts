@@ -163,6 +163,7 @@ async function fetchRealMetadata(urlStr: string) {
 }
 
 // REST api route to parse URL context using AI
+app.post("/api/info",async(req,res)=>{try{const{getMediaInfo}=await import("./server/services/metadata.js");res.json(await getMediaInfo(req.body.url))}catch(err:any){res.status(500).json({error:err.message})}});
 app.post("/api/parse-url", async (req, res) => {
   const { url: rawUrl } = req.body;
 
