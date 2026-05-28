@@ -227,18 +227,25 @@ export default function App() {
     }
 
     let url = job.filePath.startsWith('http') ? job.filePath : `${BASE_URL}${job.filePath}`;
+    let isProxied = false;
 
-    // Force immediate download of external links by routing them through proxy-download
-    if (job.filePath.startsWith('http') && 
+    // Force immediate download of external MP3 links by routing them through proxy-download
+    // We avoid proxying MP4 files because video files are often too large for Render's request limits
+    if (job.format === 'mp3' &&
+        job.filePath.startsWith('http') && 
         !job.filePath.includes(window.location.hostname) && 
         !job.filePath.includes('unistreamdownloader.onrender.com')) {
       const filename = job.filename || `${job.title}.${job.format}`;
       url = `${BASE_URL}/api/proxy-download?url=${encodeURIComponent(job.filePath)}&filename=${encodeURIComponent(filename)}`;
+      isProxied = true;
     }
 
     const a = document.createElement('a');
     a.href = url;
     a.download = job.filename || `${job.title}.${job.format}`;
+    if (!isProxied) {
+      a.target = '_blank';
+    }
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
