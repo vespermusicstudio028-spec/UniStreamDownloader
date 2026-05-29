@@ -57,18 +57,27 @@ export const api = {
     return res.json();
   },
 
-  /** POST /api/transcribe — Transcribe audio to text */
+  /**
+   * POST /api/transcribe — Real AI transcription.
+   * Backend downloads the audio via yt-dlp, sends it to Gemini for genuine
+   * speech-to-text, and streams back a .txt file.
+   * Returns a blob URL for immediate download in the browser.
+   */
   async transcribe(url: string, title: string): Promise<{ downloadUrl: string }> {
-    const res = await fetch(`${BASE_URL}/api/get-stream-url`, {
+    const res = await fetch(`${BASE_URL}/api/transcribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, format: 'txt', filename: title }),
+      body: JSON.stringify({ url, title }),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: 'Falha na transcrição' }));
+      // Try to parse error JSON, fall back to status text
+      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
       throw new Error(err.error || `HTTP ${res.status}`);
     }
-    return res.json();
+    // Server responds with the .txt file directly — create a blob URL for <a> download
+    const blob = await res.blob();
+    const downloadUrl = URL.createObjectURL(blob);
+    return { downloadUrl };
   },
 
   /** POST /api/get-stream-url — Legacy route for Cobalt streaming URL */

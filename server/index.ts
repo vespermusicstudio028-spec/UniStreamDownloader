@@ -8,6 +8,7 @@ import { createServer as createViteServer } from 'vite';
 import infoRouter from './routes/info.js';
 import downloadRouter from './routes/download.js';
 import mp3Router from './routes/mp3.js';
+import transcribeRouter from './routes/transcribe.js';
 
 // Utils
 import { startAutoCleanup } from './utils/cleanup.js';
@@ -49,6 +50,7 @@ app.use((req, res, next) => {
 app.use('/api/info', infoRouter);
 app.use('/api/download', downloadRouter);
 app.use('/api/mp3', mp3Router);
+app.use('/api/transcribe', transcribeRouter);
 
 // ========================
 // Legacy routes (kept for compatibility)
