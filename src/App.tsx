@@ -19,6 +19,7 @@ import AboutPage from './pages/AboutPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import ContactPage from './pages/ContactPage';
+import TranscriptionModal from './components/TranscriptionModal';
 
 // @ts-ignore
 import unistreamLogo from './assets/images/unistream_logo_1779851975537.png';
@@ -145,6 +146,9 @@ export default function App() {
   const [currentInfo, setCurrentInfo] = useState<MediaInfo | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [transcriptionText, setTranscriptionText] = useState<string | null>(null);
+  const [transcriptionTitle, setTranscriptionTitle] = useState<string>('');
+  const [showTranscriptionModal, setShowTranscriptionModal] = useState(false);
 
   const { toasts, toast, removeToast } = useToast();
   const { favorites, toggleFavorite } = useFavorites();
@@ -189,13 +193,11 @@ export default function App() {
     if (params.format === 'txt') {
       try {
         const result = await api.transcribe(currentUrl, sanitizedTitle);
-        const a = document.createElement('a');
-        a.href = result.downloadUrl;
-        a.download = `${sanitizedTitle}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        toast.success('📝 Transcrição gerada!', 'Arquivo de texto baixado com sucesso.');
+        const blobText = await fetch(result.downloadUrl).then((r) => r.text());
+        setTranscriptionTitle(currentInfo.title);
+        setTranscriptionText(blobText);
+        setShowTranscriptionModal(true);
+        toast.success('📝 Transcrição gerada!', 'Texto obtido com sucesso.');
       } catch (err: any) {
         toast.error('Falha na transcrição', err.message);
       } finally {
@@ -357,6 +359,12 @@ export default function App() {
 
       <FooterNav />
       <ToastNotifications toasts={toasts} onRemove={removeToast} />
+      <TranscriptionModal
+        isOpen={showTranscriptionModal}
+        onClose={() => setShowTranscriptionModal(false)}
+        title={transcriptionTitle}
+        text={transcriptionText || ''}
+      />
     </div>
   );
 }

@@ -115,20 +115,22 @@ router.post('/', async (req, res) => {
               {
                 text: `Você é um transcritor profissional de áudio e vídeo. Transcreva com precisão TUDO o que é dito neste áudio, em Português Brasileiro.
 
+IMPORTANTE: Se a mídia for uma música (clipe, faixa de áudio, cover, etc.), além ou no lugar da transcrição fonética, você DEVE recuperar a LETRA OFICIAL COMPLETA (lyrics) da música na língua original (e tradução se apropriado) a partir do seu banco de dados de conhecimento global e colocá-la na seção de transcrição formatada de maneira limpa.
+
 Siga este formato (texto simples, sem markdown, sem blocos de código):
 
 ============= UNISTREAM TRANSCRIPTION SERVICE =============
 - Título: ${mediaTitle}
 - Canal/Autor: ${mediaAuthor}
 - URL: ${url}
-- Método: Transcrição Real de Áudio via Google Gemini AI
+- Método: Transcrição Real de Áudio + Letra Oficial via Google Gemini AI
 - Data: ${new Date().toLocaleDateString('pt-BR')}
 
 ============= RESUMO EXECUTIVO =============
-[Escreva 2-3 parágrafos resumindo os principais temas, argumentos e conclusões do conteúdo]
+[Escreva 2-3 parágrafos resumindo a música ou o tema do áudio, seu significado, contexto de lançamento ou mensagem principal]
 
-============= TRANSCRIÇÃO COMPLETA =============
-[Transcreva palavra por palavra tudo que foi dito. Use timestamps [MM:SS] a cada mudança de assunto ou a cada 30 segundos. Identifique os falantes quando possível, ex: "Apresentador:", "Entrevistado:". Use [Música] para trechos instrumentais e [inaudível] para trechos incompreensíveis. Não invente nenhum conteúdo.]
+============= LETRA DA MÚSICA / TRANSCRIÇÃO COMPLETA =============
+[Se for música: Coloque a letra oficial completa organizada por estrofes. Se for fala/podcast: Transcreva palavra por palavra tudo que foi dito com timestamps [MM:SS] a cada 30 segundos.]
 
 ============= PALAVRAS-CHAVE E DESTAQUES =============
 [Liste as 5-10 principais ideias, frases marcantes e conclusões do conteúdo]`
@@ -152,7 +154,9 @@ Siga este formato (texto simples, sem markdown, sem blocos de código):
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Analise o vídeo abaixo e gere um relatório de análise de conteúdo. DEIXE CLARO que esta é uma análise por IA baseada nos metadados do vídeo, NÃO uma transcrição real do áudio.
+        contents: `Você é um assistente inteligente. Analise a mídia abaixo com base nos metadados.
+        
+IMPORTANTE: Se a mídia for uma música conhecida (baseado no título e canal), você DEVE recuperar e fornecer a LETRA OFICIAL COMPLETA (lyrics) dessa música em vez de apenas simular uma análise.
 
 Título: ${mediaTitle}
 Canal: ${mediaAuthor}
@@ -161,21 +165,20 @@ Data: ${new Date().toLocaleDateString('pt-BR')}
 
 Formate em texto simples, sem markdown:
 
-============= UNISTREAM - ANÁLISE DE CONTEÚDO POR IA =============
+============= UNISTREAM - ANÁLISE E LETRA POR IA =============
 - Título: ${mediaTitle}
 - Canal: ${mediaAuthor}
 - URL: ${url}
 - Data: ${new Date().toLocaleDateString('pt-BR')}
-- AVISO: Análise por IA com base nos metadados. O áudio não pôde ser baixado automaticamente nesta sessão.
 
-============= ANÁLISE DO CONTEÚDO =============
-[Analise o que o vídeo provavelmente aborda com base no título e no canal]
+============= SIGNIFICADO E RESUMO =============
+[Explique o contexto, autoria, gênero e o significado do vídeo ou da música]
 
-============= TÓPICOS PROVÁVEIS =============
-[Liste os temas e pontos que provavelmente são abordados no vídeo]
+============= LETRA OFICIAL / CONTEÚDO ESTIMADO =============
+[Se for música conhecida: Forneça a letra oficial completa e organizada. Se for outro tipo de conteúdo: Forneça um resumo detalhado estruturado do que é falado.]
 
-============= OBSERVAÇÃO TÉCNICA =============
-Para obter a transcrição real do áudio, certifique-se de que o servidor tem acesso ao yt-dlp e à variável GEMINI_API_KEY configurada.`
+============= TÓPICOS E DESTAQUES =============
+[Destaque as principais frases ou ideias da música/conteúdo]`
       });
       transcriptText = response.text?.trim() || 'Falha ao gerar análise.';
     } catch {
