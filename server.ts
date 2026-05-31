@@ -80,16 +80,15 @@ app.use("/api/mp3", mp3Router);
 app.use("/api/transcribe", transcribeRouter);
 
 // Initialize Gemini API client lazily to ensure no startup crashes
-let ai: GoogleGenAI | null = null;
-function getAIClient(): GoogleGenAI | null {
-  if (!ai && process.env.GEMINI_API_KEY) {
-    try {
-      ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    } catch (e) {
-      console.error("Erro ao inicializar o cliente do Google Gen AI:", e);
-    }
+function getAIClient(customKey?: string): GoogleGenAI | null {
+  const apiKey = customKey || process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  try {
+    return new GoogleGenAI({ apiKey });
+  } catch (e) {
+    console.error("Erro ao inicializar o cliente do Google Gen AI:", e);
+    return null;
   }
-  return ai;
 }
 
 // Helper to fetch real title & author from YouTube oEmbed & generic sites
@@ -213,7 +212,8 @@ app.post("/api/parse-url", async (req, res) => {
     thumbnailDescription = scrapedMetadata.thumbnailDescription;
   }
 
-  const client = getAIClient();
+  const clientKey = req.headers["x-gemini-api-key"] as string;
+  const client = getAIClient(clientKey);
   if (client) {
     try {
       const prompt = `Analise a seguinte URL: "${url}" e o título extraído: "${title}".
@@ -706,7 +706,8 @@ app.get("/api/transcribe", async (req, res) => {
     console.warn("[Transcribe Engine] Metadata extraction error:", err);
   }
 
-  const client = getAIClient();
+  const clientKey = (req.headers["x-gemini-api-key"] || req.query.gemini_key) as string;
+  const client = getAIClient(clientKey);
   let transcriptText = "";
 
   if (client) {

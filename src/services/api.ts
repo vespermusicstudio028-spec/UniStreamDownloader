@@ -6,12 +6,23 @@ const BASE_URL = (import.meta as any).env.VITE_API_BASE || (
     : ''
 );
 
+const getHeaders = (extra: Record<string, string> = {}) => {
+  const headers: Record<string, string> = { ...extra };
+  if (typeof window !== 'undefined') {
+    const key = localStorage.getItem('unistream_gemini_api_key');
+    if (key) {
+      headers['x-gemini-api-key'] = key;
+    }
+  }
+  return headers;
+};
+
 export const api = {
   /** POST /api/info — Extract metadata for a URL */
   async info(url: string): Promise<MediaInfo> {
     const res = await fetch(`${BASE_URL}/api/info`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ url }),
     });
     if (!res.ok) {
@@ -30,7 +41,7 @@ export const api = {
   }): Promise<{ jobId: string }> {
     const res = await fetch(`${BASE_URL}/api/download`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(params),
     });
     if (!res.ok) {
@@ -49,7 +60,7 @@ export const api = {
   }): Promise<{ jobId: string }> {
     const res = await fetch(`${BASE_URL}/api/mp3`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(params),
     });
     if (!res.ok) {
@@ -68,7 +79,7 @@ export const api = {
   async transcribe(url: string, title: string): Promise<{ downloadUrl: string }> {
     const res = await fetch(`${BASE_URL}/api/transcribe`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ url, title }),
     });
     if (!res.ok) {
@@ -91,7 +102,7 @@ export const api = {
   }): Promise<{ status: string; downloadUrl: string }> {
     const res = await fetch(`${BASE_URL}/api/get-stream-url`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(params),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

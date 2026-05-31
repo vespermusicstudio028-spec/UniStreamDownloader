@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import { Download, Moon, Sun, Bell, Activity } from 'lucide-react';
+import { Download, Moon, Sun, Bell, Activity, Settings } from 'lucide-react';
 import './index.css';
 
 import { DownloadJob, DownloadFormat, MediaInfo } from './types';
@@ -20,6 +20,7 @@ import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import ContactPage from './pages/ContactPage';
 import TranscriptionModal from './components/TranscriptionModal';
+import SettingsModal from './components/SettingsModal';
 
 // @ts-ignore
 import unistreamLogo from './assets/images/unistream_logo_1779851975537.png';
@@ -27,10 +28,11 @@ import unistreamLogo from './assets/images/unistream_logo_1779851975537.png';
 const HISTORY_KEY = 'unistream_jobs_v2';
 
 // ── Shared Header ───────────────────────────────────────────────────────────
-function Header({ darkMode, onToggleDark, onRequestNotifications }: {
+function Header({ darkMode, onToggleDark, onRequestNotifications, onOpenSettings }: {
   darkMode: boolean;
   onToggleDark: () => void;
   onRequestNotifications: () => void;
+  onOpenSettings: () => void;
 }) {
   const location = useLocation();
   const isHome = location.pathname === '/';
@@ -72,6 +74,9 @@ function Header({ darkMode, onToggleDark, onRequestNotifications }: {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button onClick={onRequestNotifications} className="btn btn-ghost btn-sm" title="Ativar notificações">
             <Bell size={16} />
+          </button>
+          <button onClick={onOpenSettings} className="btn btn-ghost btn-sm" title="Configurações de IA">
+            <Settings size={16} />
           </button>
           <button onClick={onToggleDark} className="btn btn-ghost btn-sm" title="Alternar tema">
             {darkMode ? <Sun size={16} /> : <Moon size={16} />}
@@ -149,6 +154,7 @@ export default function App() {
   const [transcriptionText, setTranscriptionText] = useState<string | null>(null);
   const [transcriptionTitle, setTranscriptionTitle] = useState<string>('');
   const [showTranscriptionModal, setShowTranscriptionModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   const { toasts, toast, removeToast } = useToast();
   const { favorites, toggleFavorite } = useFavorites();
@@ -345,6 +351,7 @@ export default function App() {
         darkMode={darkMode}
         onToggleDark={() => setDarkMode((p) => !p)}
         onRequestNotifications={requestNotifications}
+        onOpenSettings={() => setShowSettingsModal(true)}
       />
 
       <Routes>
@@ -364,6 +371,15 @@ export default function App() {
         onClose={() => setShowTranscriptionModal(false)}
         title={transcriptionTitle}
         text={transcriptionText || ''}
+      />
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        onSave={(key) => {
+          localStorage.setItem('unistream_gemini_api_key', key);
+          toast.success('Configurações salvas!', 'Chave API do Gemini atualizada com sucesso.');
+        }}
+        initialKey={localStorage.getItem('unistream_gemini_api_key') || ''}
       />
     </div>
   );

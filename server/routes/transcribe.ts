@@ -14,13 +14,16 @@ import { ensureTmpDir, cleanupFile } from '../utils/cleanup.js';
 
 const router = Router();
 
-// ─── Lazy Gemini client ──────────────────────────────────────────────────────
-let _ai: GoogleGenAI | null = null;
-function getAI(): GoogleGenAI | null {
-  if (!_ai && process.env.GEMINI_API_KEY) {
-    try { _ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }); } catch { /* ignore */ }
+// ─── Gemini client instantiator ──────────────────────────────────────────────
+function getAI(customKey?: string): GoogleGenAI | null {
+  const apiKey = customKey || process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  try {
+    return new GoogleGenAI({ apiKey });
+  } catch (e) {
+    logger.error('Transcribe', `Erro ao inicializar GoogleGenAI: ${(e as Error).message}`);
+    return null;
   }
-  return _ai;
 }
 
 // ─── Mime type map for audio extensions ─────────────────────────────────────
@@ -94,7 +97,8 @@ router.post('/', async (req, res) => {
   }
 
   // ── Step 3: Transcribe with Gemini ───────────────────────────────────────
-  const ai = getAI();
+  const clientKey = (req.headers['x-gemini-api-key'] || req.body.geminiApiKey) as string;
+  const ai = getAI(clientKey);
   let transcriptText = '';
 
   if (ai) {
