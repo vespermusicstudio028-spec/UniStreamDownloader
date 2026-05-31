@@ -1,22 +1,33 @@
 import React, { useState } from 'react';
-import { X, Save, Eye, EyeOff, ShieldCheck, Key } from 'lucide-react';
+import { X, Save, Eye, EyeOff, ShieldCheck, Key, Cpu } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (key: string) => void;
-  initialKey: string;
+  onSave: (provider: string, geminiKey: string, openaiKey: string) => void;
+  initialProvider: string;
+  initialGeminiKey: string;
+  initialOpenaiKey: string;
 }
 
-export default function SettingsModal({ isOpen, onClose, onSave, initialKey }: SettingsModalProps) {
-  const [key, setKey] = useState(initialKey);
+export default function SettingsModal({
+  isOpen,
+  onClose,
+  onSave,
+  initialProvider,
+  initialGeminiKey,
+  initialOpenaiKey
+}: SettingsModalProps) {
+  const [provider, setProvider] = useState(initialProvider || 'gemini');
+  const [geminiKey, setGeminiKey] = useState(initialGeminiKey || '');
+  const [openaiKey, setOpenaiKey] = useState(initialOpenaiKey || '');
   const [showKey, setShowKey] = useState(false);
 
   if (!isOpen) return null;
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(key.trim());
+    onSave(provider, geminiKey.trim(), openaiKey.trim());
     onClose();
   };
 
@@ -75,6 +86,8 @@ export default function SettingsModal({ isOpen, onClose, onSave, initialKey }: S
 
         {/* Form Body */}
         <form onSubmit={handleSave} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          
+          {/* Provider Select */}
           <div>
             <label style={{
               display: 'block',
@@ -85,73 +98,206 @@ export default function SettingsModal({ isOpen, onClose, onSave, initialKey }: S
               textTransform: 'uppercase',
               letterSpacing: '0.05em'
             }}>
-              Chave API do Google Gemini
+              Provedor de Inteligência Artificial
             </label>
             <div style={{ position: 'relative' }}>
-              <input
-                type={showKey ? 'text' : 'password'}
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                placeholder="Insira sua chave (AIzaSy...)"
+              <select
+                value={provider}
+                onChange={(e) => {
+                  setProvider(e.target.value);
+                  setShowKey(false);
+                }}
                 style={{
                   width: '100%',
-                  padding: '10px 40px 10px 12px',
+                  padding: '10px 12px',
                   background: 'rgba(0,0,0,0.2)',
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--radius-md)',
                   color: 'var(--text-primary)',
                   fontSize: '0.85rem',
                   outline: 'none',
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowKey(!showKey)}
-                style={{
-                  position: 'absolute',
-                  right: 12,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-muted)',
                   cursor: 'pointer',
-                  padding: 0,
-                  display: 'flex',
-                  alignItems: 'center'
+                  appearance: 'none',
+                  WebkitAppearance: 'none'
                 }}
               >
-                {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
+                <option value="gemini" style={{ background: '#0a0f1d' }}>Google Gemini (Padrão)</option>
+                <option value="openai" style={{ background: '#0a0f1d' }}>OpenAI ChatGPT / Whisper</option>
+              </select>
+              <div style={{
+                position: 'absolute',
+                right: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+                color: 'var(--text-muted)',
+                fontSize: '0.75rem'
+              }}>
+                ▼
+              </div>
             </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.4 }}>
-              Esta chave é salva localmente apenas no seu navegador. Ela é usada diretamente pelo servidor para as requisições de transcrição e análise de IA.
-            </p>
           </div>
 
-          <div style={{
-            background: 'rgba(8,145,178,0.05)',
-            border: '1px solid rgba(8,145,178,0.15)',
-            borderRadius: 'var(--radius-md)',
-            padding: 12,
-            display: 'flex',
-            gap: 10,
-            alignItems: 'flex-start'
-          }}>
-            <ShieldCheck size={18} color="var(--cyan)" style={{ flexShrink: 0, marginTop: 2 }} />
-            <div style={{ fontSize: '0.75rem', lineHeight: 1.4, color: 'var(--text-secondary)' }}>
-              <strong>Como conseguir uma chave gratuita?</strong>
-              <br />
-              Você pode gerar uma chave Gemini API gratuita em poucos segundos acessando o <a 
-                href="https://aistudio.google.com/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                style={{ color: 'var(--cyan)', textDecoration: 'underline', fontWeight: 600 }}
-              >
-                Google AI Studio
-              </a>.
+          {/* Conditional Inputs */}
+          {provider === 'gemini' ? (
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: 'var(--text-secondary)',
+                marginBottom: 6,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}>
+                Chave API do Google Gemini
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  value={geminiKey}
+                  onChange={(e) => setGeminiKey(e.target.value)}
+                  placeholder="Insira sua chave (AIzaSy...)"
+                  style={{
+                    width: '100%',
+                    padding: '10px 40px 10px 12px',
+                    background: 'rgba(0,0,0,0.2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.85rem',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKey(!showKey)}
+                  style={{
+                    position: 'absolute',
+                    right: 12,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                >
+                  {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.4 }}>
+                Usada diretamente pelo servidor para as requisições de transcrição e análise de IA com os modelos Gemini.
+              </p>
+
+              <div style={{
+                background: 'rgba(8,145,178,0.05)',
+                border: '1px solid rgba(8,145,178,0.15)',
+                borderRadius: 'var(--radius-md)',
+                padding: 12,
+                display: 'flex',
+                gap: 10,
+                alignItems: 'flex-start',
+                marginTop: 12
+              }}>
+                <ShieldCheck size={18} color="var(--cyan)" style={{ flexShrink: 0, marginTop: 2 }} />
+                <div style={{ fontSize: '0.75rem', lineHeight: 1.4, color: 'var(--text-secondary)' }}>
+                  <strong>Como conseguir uma chave gratuita?</strong>
+                  <br />
+                  Você pode gerar uma chave Gemini API gratuita em poucos segundos acessando o <a 
+                    href="https://aistudio.google.com/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--cyan)', textDecoration: 'underline', fontWeight: 600 }}
+                  >
+                    Google AI Studio
+                  </a>.
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: 'var(--text-secondary)',
+                marginBottom: 6,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}>
+                Chave API do ChatGPT / OpenAI
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  value={openaiKey}
+                  onChange={(e) => setOpenaiKey(e.target.value)}
+                  placeholder="Insira sua chave (sk-...)"
+                  style={{
+                    width: '100%',
+                    padding: '10px 40px 10px 12px',
+                    background: 'rgba(0,0,0,0.2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.85rem',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKey(!showKey)}
+                  style={{
+                    position: 'absolute',
+                    right: 12,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                >
+                  {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.4 }}>
+                Usada para transcrição via modelo Whisper-1 e análise de metadados via gpt-4o-mini.
+              </p>
+
+              <div style={{
+                background: 'rgba(16,185,129,0.05)',
+                border: '1px solid rgba(16,185,129,0.15)',
+                borderRadius: 'var(--radius-md)',
+                padding: 12,
+                display: 'flex',
+                gap: 10,
+                alignItems: 'flex-start',
+                marginTop: 12
+              }}>
+                <Cpu size={18} color="var(--emerald)" style={{ flexShrink: 0, marginTop: 2 }} />
+                <div style={{ fontSize: '0.75rem', lineHeight: 1.4, color: 'var(--text-secondary)' }}>
+                  <strong>Obter Chave da OpenAI</strong>
+                  <br />
+                  Você pode gerar ou gerenciar as suas chaves API do ChatGPT na página de desenvolvedores: <a 
+                    href="https://platform.openai.com/api-keys" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--emerald)', textDecoration: 'underline', fontWeight: 600 }}
+                  >
+                    OpenAI Platform Keys
+                  </a>.
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Action buttons */}
           <div style={{

@@ -9,10 +9,13 @@ const BASE_URL = (import.meta as any).env.VITE_API_BASE || (
 const getHeaders = (extra: Record<string, string> = {}) => {
   const headers: Record<string, string> = { ...extra };
   if (typeof window !== 'undefined') {
-    const key = localStorage.getItem('unistream_gemini_api_key');
-    if (key) {
-      headers['x-gemini-api-key'] = key;
-    }
+    const provider = localStorage.getItem('unistream_ai_provider') || 'gemini';
+    const geminiKey = localStorage.getItem('unistream_gemini_api_key');
+    const openaiKey = localStorage.getItem('unistream_openai_api_key');
+    
+    headers['x-ai-provider'] = provider;
+    if (geminiKey) headers['x-gemini-api-key'] = geminiKey;
+    if (openaiKey) headers['x-openai-api-key'] = openaiKey;
   }
   return headers;
 };

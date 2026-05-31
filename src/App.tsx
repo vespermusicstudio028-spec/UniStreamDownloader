@@ -375,11 +375,15 @@ export default function App() {
       <SettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
-        onSave={(key) => {
-          localStorage.setItem('unistream_gemini_api_key', key);
-          toast.success('Configurações salvas!', 'Chave API do Gemini atualizada com sucesso.');
+        onSave={(provider, geminiKey, openaiKey) => {
+          localStorage.setItem('unistream_ai_provider', provider);
+          localStorage.setItem('unistream_gemini_api_key', geminiKey);
+          localStorage.setItem('unistream_openai_api_key', openaiKey);
+          toast.success('Configurações salvas!', 'Suas configurações de IA foram atualizadas.');
         }}
-        initialKey={localStorage.getItem('unistream_gemini_api_key') || ''}
+        initialProvider={localStorage.getItem('unistream_ai_provider') || 'gemini'}
+        initialGeminiKey={localStorage.getItem('unistream_gemini_api_key') || ''}
+        initialOpenaiKey={localStorage.getItem('unistream_openai_api_key') || ''}
       />
     </div>
   );

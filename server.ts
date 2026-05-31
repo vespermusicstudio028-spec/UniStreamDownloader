@@ -212,11 +212,11 @@ app.post("/api/parse-url", async (req, res) => {
     thumbnailDescription = scrapedMetadata.thumbnailDescription;
   }
 
-  const clientKey = req.headers["x-gemini-api-key"] as string;
-  const client = getAIClient(clientKey);
-  if (client) {
-    try {
-      const prompt = `Analise a seguinte URL: "${url}" e o título extraído: "${title}".
+  const aiProvider = req.headers["x-ai-provider"] as string || "gemini";
+  const geminiKey = req.headers["x-gemini-api-key"] as string;
+  const openaiKey = req.headers["x-openai-api-key"] as string;
+
+  const prompt = `Analise a seguinte URL: "${url}" e o título extraído: "${title}".
 Seu objetivo é gerar metadados de vídeo realistas e refinados para um gerenciador de download.
 Retorne APENAS um objeto JSON válido com os seguintes campos (sem blocos de código markdown):
 {
@@ -226,73 +226,107 @@ Retorne APENAS um objeto JSON válido com os seguintes campos (sem blocos de có
   "thumbnailDescription": "Curta descrição da imagem de capa compatível"
 }`;
 
-      const response = await client.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-        }
+  let parsedSuccessfully = false;
+
+  if (aiProvider === "openai" && openaiKey) {
+    try {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${openaiKey}`
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          response_format: { type: "json_object" },
+          messages: [
+            {
+              role: "user",
+              content: prompt
+            }
+          ]
+        })
       });
 
-      const text = response.text?.trim() || "";
-      let jsonText = text;
-      // Clean potential codeblocks markdown
-      if (jsonText.startsWith("```json")) {
-        jsonText = jsonText.replace(/^```json/, "").replace(/```$/, "").trim();
-      } else if (jsonText.startsWith("```")) {
-        jsonText = jsonText.replace(/^```/, "").replace(/```$/, "").trim();
+      if (response.ok) {
+        const data = await response.json() as any;
+        const jsonText = data.choices[0].message.content.trim();
+        const parsed = JSON.parse(jsonText);
+        title = parsed.title || title;
+        durationSeconds = parsed.durationSeconds || durationSeconds;
+        author = parsed.author || author;
+        thumbnailDescription = parsed.thumbnailDescription || thumbnailDescription;
+        parsedSuccessfully = true;
+      } else {
+        console.warn(`OpenAI API responded with status ${response.status}`);
       }
-
-      const parsed = JSON.parse(jsonText);
-      title = parsed.title || title;
-      durationSeconds = parsed.durationSeconds || durationSeconds;
-      author = parsed.author || author;
-      thumbnailDescription = parsed.thumbnailDescription || thumbnailDescription;
     } catch (err) {
-      console.warn("Falha ao consultar o Gemini API para metadados, usando metadados plausíveis de fallback:", err);
-      if (!scrapedMetadata) {
-        if (url.includes("youtube") || url.includes("youtu.be")) {
-          title = "Incrível Compilação de Vídeos Virais 2026";
-          author = "@MundoViral";
-          durationSeconds = 245;
-        } else if (url.includes("instagram")) {
-          title = "Tendências de Viagem e Momentos Inesquecíveis";
-          author = "@explorador_vida";
-          durationSeconds = 45;
-        } else if (url.includes("tiktok")) {
-          title = "Coreografia viral do hit do momento! #dance";
-          author = "@tiktok_dancer";
-          durationSeconds = 30;
-        } else if (url.includes("kwai")) {
-          title = "Comédia da vida real - Olha o que ele fez!";
-          author = "@kwai_humor";
-          durationSeconds = 60;
-        } else if (url.includes("facebook")) {
-          title = "Vídeo Compartilhado da Comunidade Criativa";
-          author = "Portal Novidades";
-          durationSeconds = 180;
-        } else if (url.includes("twitter") || url.includes("x.com")) {
-          title = "Vídeo informativo sobre tecnologia espacial";
-          author = "@space_feed";
-          durationSeconds = 90;
-        }
-      }
+      console.warn("Falha ao consultar a OpenAI API para metadados:", err);
     }
   } else {
-    // Generate default titles using URL if scraped title is generic
+    const client = getAIClient(geminiKey);
+    if (client) {
+      try {
+        const response = await client.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+          }
+        });
+
+        const text = response.text?.trim() || "";
+        let jsonText = text;
+        // Clean potential codeblocks markdown
+        if (jsonText.startsWith("```json")) {
+          jsonText = jsonText.replace(/^```json/, "").replace(/```$/, "").trim();
+        } else if (jsonText.startsWith("```")) {
+          jsonText = jsonText.replace(/^```/, "").replace(/```$/, "").trim();
+        }
+
+        const parsed = JSON.parse(jsonText);
+        title = parsed.title || title;
+        durationSeconds = parsed.durationSeconds || durationSeconds;
+        author = parsed.author || author;
+        thumbnailDescription = parsed.thumbnailDescription || thumbnailDescription;
+        parsedSuccessfully = true;
+      } catch (err) {
+        console.warn("Falha ao consultar o Gemini API para metadados:", err);
+      }
+    }
+  }
+
+  // Fallback defaults if no AI request succeeded
+  if (!parsedSuccessfully) {
     if (!scrapedMetadata) {
       if (url.includes("youtube") || url.includes("youtu.be")) {
-        title = "Vídeo Educativo do YouTube";
-        author = "@educador_digital";
-        durationSeconds = 420;
+        title = "Incrível Compilação de Vídeos Virais 2026";
+        author = "@MundoViral";
+        durationSeconds = 245;
       } else if (url.includes("instagram")) {
-        title = "Story / Reel de Estilo de Vida";
-        author = "@insta_lifestyle";
-        durationSeconds = 15;
+        title = "Tendências de Viagem e Momentos Inesquecíveis";
+        author = "@explorador_vida";
+        durationSeconds = 45;
       } else if (url.includes("tiktok")) {
-        title = "Desafio Engraçado Viral";
-        author = "@tiktok_fun";
-        durationSeconds = 28;
+        title = "Coreografia viral do hit do momento! #dance";
+        author = "@tiktok_dancer";
+        durationSeconds = 30;
+      } else if (url.includes("kwai")) {
+        title = "Comédia da vida real - Olha o que ele fez!";
+        author = "@kwai_humor";
+        durationSeconds = 60;
+      } else if (url.includes("facebook")) {
+        title = "Vídeo Compartilhado da Comunidade Criativa";
+        author = "Portal Novidades";
+        durationSeconds = 180;
+      } else if (url.includes("twitter") || url.includes("x.com")) {
+        title = "Vídeo informativo sobre tecnologia espacial";
+        author = "@space_feed";
+        durationSeconds = 90;
+      } else {
+        title = "Vídeo Interessante da Web";
+        author = "@criador_conteudo";
+        durationSeconds = 150;
       }
     }
   }

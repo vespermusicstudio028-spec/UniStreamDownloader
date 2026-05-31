@@ -10,3 +10,7 @@ desktop.ini
 *.mp4
 
 .vercel
+
+# Secrets
+*UniStream.txt
+*key*.txt
