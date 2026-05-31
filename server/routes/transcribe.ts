@@ -26,6 +26,35 @@ function getAI(customKey?: string): GoogleGenAI | null {
   }
 }
 
+// Helper wrapper to run yt-dlp with execution timeout
+function runYtDlpWithTimeout(url: string, options: any, timeoutMs: number = 7000): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    let completed = false;
+    const timeout = setTimeout(() => {
+      if (!completed) {
+        completed = true;
+        reject(new Error(`Timeout de ${timeoutMs}ms excedido ao buscar legendas`));
+      }
+    }, timeoutMs);
+
+    (youtubedl as any)(url, options)
+      .then(() => {
+        if (!completed) {
+          completed = true;
+          clearTimeout(timeout);
+          resolve();
+        }
+      })
+      .catch((err: any) => {
+        if (!completed) {
+          completed = true;
+          clearTimeout(timeout);
+          reject(err);
+        }
+      });
+  });
+}
+
 // ─── Mime type map for audio extensions ─────────────────────────────────────
 const MIME: Record<string, string> = {
   webm: 'audio/webm', m4a: 'audio/mp4', mp3: 'audio/mpeg',
@@ -69,26 +98,44 @@ router.post('/', async (req, res) => {
 
   try {
     logger.info('Transcribe', `Buscando legendas rápidas para: ${url}`);
-    await (youtubedl as any)(url, {
+    
+    // We use a relative output path 'tmp/sub_...' to bypass spaces in path parsing bugs of youtube-dl-exec
+    await runYtDlpWithTimeout(url, {
       skipDownload: true,
       writeAutoSubs: true,
       writeSubs: true,
-      subLangs: 'pt,en,es',
-      output: path.join(tmpDir, tmpBase),
+      subLangs: 'pt,en',
+      output: `tmp/${tmpBase}.%(lang)s.%(ext)s`,
       noWarnings: true,
       noCheckCertificates: true,
       addHeader: ['referer:youtube.com', 'user-agent:Mozilla/5.0'],
+    }, 7000); // 7s timeout to prevent long hangs
+
+    // Check if any subtitle file was generated in the absolute tmp folder
+    const files = fs.readdirSync(tmpDir);
+    const matchingFiles = files.filter(f => f.startsWith(tmpBase) && (f.endsWith('.vtt') || f.endsWith('.srt')));
+
+    // Sort to prioritize pt, then en, then others
+    matchingFiles.sort((a, b) => {
+      if (a.includes('.pt.')) return -1;
+      if (b.includes('.pt.')) return 1;
+      if (a.includes('.en.')) return -1;
+      if (b.includes('.en.')) return 1;
+      return 0;
     });
 
-    // Check if any subtitle file was generated
-    const files = fs.readdirSync(tmpDir);
-    const subFile = files.find(f => f.startsWith(tmpBase) && (f.endsWith('.vtt') || f.endsWith('.srt')));
-    
+    const subFile = matchingFiles[0];
     if (subFile) {
       const subFilePath = path.join(tmpDir, subFile);
       subtitleContent = fs.readFileSync(subFilePath, 'utf-8');
       logger.info('Transcribe', `Legendas encontradas e lidas: ${subFile}`);
-      cleanupFile(subFilePath);
+      
+      // Clean up all subtitle files generated matching this base
+      for (const file of matchingFiles) {
+        try {
+          fs.unlinkSync(path.join(tmpDir, file));
+        } catch {}
+      }
     } else {
       logger.info('Transcribe', 'Nenhuma legenda disponível via yt-dlp.');
     }
