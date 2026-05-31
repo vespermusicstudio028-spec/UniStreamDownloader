@@ -16,7 +16,7 @@ const router = Router();
 
 // ─── Gemini client instantiator ──────────────────────────────────────────────
 function getAI(customKey?: string): GoogleGenAI | null {
-  const apiKey = customKey || process.env.GEMINI_API_KEY;
+  const apiKey = customKey || process.env.GEMINI_API_KEY || "AIzaSyAiWpw69dhK54MDbQPcTt1knzhBOvprL2U";
   if (!apiKey) return null;
   try {
     return new GoogleGenAI({ apiKey });
@@ -96,112 +96,19 @@ router.post('/', async (req, res) => {
     logger.warn('Transcribe', `Erro ao buscar legendas via yt-dlp: ${subErr.message}`);
   }
 
-  // ── Step 3: Transcribe with AI ───────────────────────────────────────────
-  const aiProvider = (req.headers['x-ai-provider'] || req.body.aiProvider) as string || 'gemini';
+  // ── Step 3: Transcribe with Gemini ───────────────────────────────────────
   const geminiKey = (req.headers['x-gemini-api-key'] || req.body.geminiApiKey) as string;
-  const openaiKey = (req.headers['x-openai-api-key'] || req.body.openaiApiKey) as string;
   let transcriptText = '';
 
-  if (aiProvider === 'openai' && openaiKey) {
+  const ai = getAI(geminiKey);
+  if (ai) {
     try {
-      let promptContent = '';
       if (subtitleContent) {
-        logger.info('Transcribe', 'Enviando legendas obtidas para o ChatGPT...');
-        promptContent = `Você é um formatador profissional de transcrições do UniStream Downloader.
-Recebemos este arquivo de legenda (VTT/SRT) do vídeo e precisamos de uma transcrição organizada, limpa e com pontuação correta em Português Brasileiro.
-
-Título: ${mediaTitle}
-Canal: ${mediaAuthor}
-URL: ${url}
-
-Legendas:
-${subtitleContent.substring(0, 35000)}
-
-Siga exatamente o formato abaixo (texto simples, sem markdown, sem blocos de código):
-
-============= UNISTREAM TRANSCRIPTION SERVICE =============
-- Título: ${mediaTitle}
-- Canal/Autor: ${mediaAuthor}
-- URL: ${url}
-- Método: Transcrição Otimizada de Legendas via OpenAI ChatGPT IA (Fast Track)
-- Data: ${new Date().toLocaleDateString('pt-BR')}
-
-============= RESUMO EXECUTIVO =============
-[Escreva 2 parágrafos resumindo detalhadamente os temas, tópicos e conclusões do vídeo]
-
-============= TRANSCRIÇÃO DETALHADA =============
-[Organize o texto das legendas acima em parágrafos coerentes, adicione pontuação correta (pontos, vírgulas, interrogações), corrija pequenos erros de ortografia fonética e insira timestamps [MM:SS] aproximados a cada início de tópico importante. Remova marcas repetitivas das legendas.]
-
-============= PALAVRAS-CHAVE E DESTAQUES =============
-[Liste as principais ideias ou frases do conteúdo]`;
-      } else {
-        logger.info('Transcribe', 'Buscando letra/conteúdo do vídeo via ChatGPT...');
-        promptContent = `Você é um assistente inteligente de transcrição do UniStream Downloader.
-Não conseguimos baixar as legendas diretamente. Precisamos que você gere a letra completa da música (se for música) ou um relatório e resumo estruturado do assunto abordado.
-
-IMPORTANTE: Se o título/canal indicar que a mídia é uma MÚSICA (canção, clipe, faixa), você DEVE recuperar e fornecer a LETRA OFICIAL COMPLETA (lyrics) dessa música em seu banco de dados global de conhecimento.
-
-Título: ${mediaTitle}
-Canal: ${mediaAuthor}
-URL: ${url}
-
-Siga exatamente o formato abaixo (texto simples, sem markdown, sem blocos de código):
-
-============= UNISTREAM TRANSCRIPTION SERVICE =============
-- Título: ${mediaTitle}
-- Canal/Autor: ${mediaAuthor}
-- URL: ${url}
-- Método: Recuperação Inteligente de Letra/Conteúdo via OpenAI ChatGPT IA (Fast Track)
-- Data: ${new Date().toLocaleDateString('pt-BR')}
-
-============= RESUMO / CONTEXTO =============
-[Se for música: Explique o significado da letra, estilo musical e recepção. Se for palestra/vídeo: Explique do que se trata o conteúdo com base no título e autor.]
-
-============= LETRA OFICIAL / CONTEÚDO ESTIMADO =============
-[Se for música: Coloque a letra oficial completa e organizada por estrofes. Se for outro tipo de conteúdo: Forneça um resumo detalhado estruturado do que é falado.]
-
-============= TÓPICOS E DESTAQUES =============
-[Destaque as principais frases ou ideias da música/conteúdo]`;
-      }
-
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openaiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'user',
-              content: promptContent
-            }
-          ]
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`OpenAI API status ${response.status}`);
-      }
-
-      const data = await response.json() as any;
-      transcriptText = data.choices[0].message.content.trim() || '';
-      logger.info('Transcribe', `Processamento ChatGPT concluído com sucesso (${transcriptText.length} caracteres).`);
-    } catch (openaiErr: any) {
-      logger.error('Transcribe', `Erro no ChatGPT: ${openaiErr.message}`);
-      transcriptText = buildErrorText(mediaTitle, mediaAuthor, url, openaiErr.message);
-    }
-  } else {
-    const ai = getAI(geminiKey);
-    if (ai) {
-      try {
-        if (subtitleContent) {
-          // Path A: Subtitle formatter (very fast, accurate transcription)
-          logger.info('Transcribe', 'Enviando legendas obtidas para o Gemini...');
-          const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: `Você é um formatador profissional de transcrições do UniStream Downloader.
+        // Path A: Subtitle formatter (very fast, accurate transcription)
+        logger.info('Transcribe', 'Enviando legendas obtidas para o Gemini...');
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: `Você é um formatador profissional de transcrições do UniStream Downloader.
 Recebemos este arquivo de legenda (VTT/SRT) do vídeo e precisamos de uma transcrição organizada, limpa e com pontuação correta em Português Brasileiro.
 
 Título: ${mediaTitle}
@@ -228,14 +135,14 @@ Siga exatamente o formato abaixo (texto simples, sem markdown, sem blocos de có
 
 ============= PALAVRAS-CHAVE E DESTAQUES =============
 [Liste as principais ideias ou frases do conteúdo]`
-          });
-          transcriptText = response.text?.trim() || '';
-        } else {
-          // Path B: Direct smart search / Lyrics retrieval
-          logger.info('Transcribe', 'Buscando letra/conteúdo do vídeo via IA...');
-          const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: `Você é um assistente inteligente de transcrição do UniStream Downloader.
+        });
+        transcriptText = response.text?.trim() || '';
+      } else {
+        // Path B: Direct smart search / Lyrics retrieval
+        logger.info('Transcribe', 'Buscando letra/conteúdo do vídeo via IA...');
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: `Você é um assistente inteligente de transcrição do UniStream Downloader.
 Não conseguimos baixar as legendas diretamente. Precisamos que você gere a letra completa da música (se for música) ou um relatório e resumo estruturado do assunto abordado.
 
 IMPORTANTE: Se o título/canal indicar que a mídia é uma MÚSICA (canção, clipe, faixa), você DEVE recuperar e fornecer a LETRA OFICIAL COMPLETA (lyrics) dessa música em seu banco de dados global de conhecimento.
@@ -261,24 +168,23 @@ Siga exatamente o formato abaixo (texto simples, sem markdown, sem blocos de có
 
 ============= TÓPICOS E DESTAQUES =============
 [Destaque as principais frases ou ideias da música/conteúdo]`
-          });
-          transcriptText = response.text?.trim() || '';
-        }
-        logger.info('Transcribe', `Processamento concluído com sucesso (${transcriptText.length} caracteres).`);
-      } catch (geminiErr: any) {
-        logger.error('Transcribe', `Erro no Gemini: ${geminiErr.message}`);
-        transcriptText = buildErrorText(mediaTitle, mediaAuthor, url, geminiErr.message);
+        });
+        transcriptText = response.text?.trim() || '';
       }
-    } else {
-      transcriptText = `============= UNISTREAM TRANSCRIPTION SERVICE =============
+      logger.info('Transcribe', `Processamento concluído com sucesso (${transcriptText.length} caracteres).`);
+    } catch (geminiErr: any) {
+      logger.error('Transcribe', `Erro no Gemini: ${geminiErr.message}`);
+      transcriptText = buildErrorText(mediaTitle, mediaAuthor, url, geminiErr.message);
+    }
+  } else {
+    transcriptText = `============= UNISTREAM TRANSCRIPTION SERVICE =============
 Título: ${mediaTitle}
 Canal: ${mediaAuthor}
 URL: ${url}
 Data: ${new Date().toLocaleDateString('pt-BR')}
 
-AVISO: Nenhuma chave de API de IA (Gemini ou OpenAI) foi configurada localmente.
-Por favor, clique no ícone de engrenagem no cabeçalho do UniStream para configurar sua chave de API do ChatGPT ou Gemini.`;
-    }
+AVISO: A chave de API do Gemini não foi configurada no servidor.
+Por favor, verifique as configurações da variável de ambiente GEMINI_API_KEY no servidor de deploy.`;
   }
 
   // ── Step 4: Return .txt file ────────────────────────────────────────────

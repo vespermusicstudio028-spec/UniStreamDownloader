@@ -81,7 +81,7 @@ app.use("/api/transcribe", transcribeRouter);
 
 // Initialize Gemini API client lazily to ensure no startup crashes
 function getAIClient(customKey?: string): GoogleGenAI | null {
-  const apiKey = customKey || process.env.GEMINI_API_KEY;
+  const apiKey = customKey || process.env.GEMINI_API_KEY || "AIzaSyAiWpw69dhK54MDbQPcTt1knzhBOvprL2U";
   if (!apiKey) return null;
   try {
     return new GoogleGenAI({ apiKey });
@@ -212,9 +212,7 @@ app.post("/api/parse-url", async (req, res) => {
     thumbnailDescription = scrapedMetadata.thumbnailDescription;
   }
 
-  const aiProvider = req.headers["x-ai-provider"] as string || "gemini";
   const geminiKey = req.headers["x-gemini-api-key"] as string;
-  const openaiKey = req.headers["x-openai-api-key"] as string;
 
   const prompt = `Analise a seguinte URL: "${url}" e o título extraído: "${title}".
 Seu objetivo é gerar metadados de vídeo realistas e refinados para um gerenciador de download.
@@ -228,71 +226,34 @@ Retorne APENAS um objeto JSON válido com os seguintes campos (sem blocos de có
 
   let parsedSuccessfully = false;
 
-  if (aiProvider === "openai" && openaiKey) {
+  const client = getAIClient(geminiKey);
+  if (client) {
     try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${openaiKey}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          response_format: { type: "json_object" },
-          messages: [
-            {
-              role: "user",
-              content: prompt
-            }
-          ]
-        })
+      const response = await client.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+        }
       });
 
-      if (response.ok) {
-        const data = await response.json() as any;
-        const jsonText = data.choices[0].message.content.trim();
-        const parsed = JSON.parse(jsonText);
-        title = parsed.title || title;
-        durationSeconds = parsed.durationSeconds || durationSeconds;
-        author = parsed.author || author;
-        thumbnailDescription = parsed.thumbnailDescription || thumbnailDescription;
-        parsedSuccessfully = true;
-      } else {
-        console.warn(`OpenAI API responded with status ${response.status}`);
+      const text = response.text?.trim() || "";
+      let jsonText = text;
+      // Clean potential codeblocks markdown
+      if (jsonText.startsWith("```json")) {
+        jsonText = jsonText.replace(/^```json/, "").replace(/```$/, "").trim();
+      } else if (jsonText.startsWith("```")) {
+        jsonText = jsonText.replace(/^```/, "").replace(/```$/, "").trim();
       }
+
+      const parsed = JSON.parse(jsonText);
+      title = parsed.title || title;
+      durationSeconds = parsed.durationSeconds || durationSeconds;
+      author = parsed.author || author;
+      thumbnailDescription = parsed.thumbnailDescription || thumbnailDescription;
+      parsedSuccessfully = true;
     } catch (err) {
-      console.warn("Falha ao consultar a OpenAI API para metadados:", err);
-    }
-  } else {
-    const client = getAIClient(geminiKey);
-    if (client) {
-      try {
-        const response = await client.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-          }
-        });
-
-        const text = response.text?.trim() || "";
-        let jsonText = text;
-        // Clean potential codeblocks markdown
-        if (jsonText.startsWith("```json")) {
-          jsonText = jsonText.replace(/^```json/, "").replace(/```$/, "").trim();
-        } else if (jsonText.startsWith("```")) {
-          jsonText = jsonText.replace(/^```/, "").replace(/```$/, "").trim();
-        }
-
-        const parsed = JSON.parse(jsonText);
-        title = parsed.title || title;
-        durationSeconds = parsed.durationSeconds || durationSeconds;
-        author = parsed.author || author;
-        thumbnailDescription = parsed.thumbnailDescription || thumbnailDescription;
-        parsedSuccessfully = true;
-      } catch (err) {
-        console.warn("Falha ao consultar o Gemini API para metadados:", err);
-      }
+      console.warn("Falha ao consultar o Gemini API para metadados:", err);
     }
   }
 
