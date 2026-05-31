@@ -59,130 +59,118 @@ router.post('/', async (req, res) => {
     }
   } catch { /* non-fatal */ }
 
-  // ── Step 2: Download audio via yt-dlp ────────────────────────────────────
+  // ── Step 2: Retrieve subtitles via yt-dlp (Very Fast: skip-download) ─────
   const tmpDir = ensureTmpDir();
-  const tmpBase = `transcribe_${Date.now()}`;
-  const outputTemplate = path.join(tmpDir, `${tmpBase}.%(ext)s`);
-  let audioFilePath: string | null = null;
+  const tmpBase = `sub_${Date.now()}`;
+  let subtitleContent: string | null = null;
 
   try {
-    logger.info('Transcribe', `Baixando áudio de: ${url}`);
+    logger.info('Transcribe', `Buscando legendas rápidas para: ${url}`);
     await (youtubedl as any)(url, {
-      format: 'bestaudio/best',
-      output: outputTemplate,
+      skipDownload: true,
+      writeAutoSubs: true,
+      writeSubs: true,
+      subLangs: 'pt,en,es',
+      output: path.join(tmpDir, tmpBase),
       noWarnings: true,
       noCheckCertificates: true,
       addHeader: ['referer:youtube.com', 'user-agent:Mozilla/5.0'],
-      maxFilesize: '50m',   // safety cap — avoids OOM on Render free tier
     });
 
-    // Locate the resulting file
+    // Check if any subtitle file was generated
     const files = fs.readdirSync(tmpDir);
-    const found = files
-      .filter(f => f.startsWith(tmpBase))
-      .map(f => path.join(tmpDir, f))
-      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
-
-    if (found.length > 0) {
-      audioFilePath = found[0];
-      logger.info('Transcribe', `Áudio baixado: ${path.basename(audioFilePath)}`);
+    const subFile = files.find(f => f.startsWith(tmpBase) && (f.endsWith('.vtt') || f.endsWith('.srt')));
+    
+    if (subFile) {
+      const subFilePath = path.join(tmpDir, subFile);
+      subtitleContent = fs.readFileSync(subFilePath, 'utf-8');
+      logger.info('Transcribe', `Legendas encontradas e lidas: ${subFile}`);
+      cleanupFile(subFilePath);
+    } else {
+      logger.info('Transcribe', 'Nenhuma legenda disponível via yt-dlp.');
     }
-  } catch (dlErr: any) {
-    logger.warn('Transcribe', `Falha ao baixar áudio: ${dlErr.message} — usando fallback de análise por texto`);
+  } catch (subErr: any) {
+    logger.warn('Transcribe', `Erro ao buscar legendas via yt-dlp: ${subErr.message}`);
   }
 
   // ── Step 3: Transcribe with Gemini ───────────────────────────────────────
   const ai = getAI();
   let transcriptText = '';
 
-  if (ai && audioFilePath && fs.existsSync(audioFilePath)) {
-    // ── Path A: Real audio transcription ────────────────────────────────────
+  if (ai) {
     try {
-      const audioBuffer = fs.readFileSync(audioFilePath);
-      const base64Audio = audioBuffer.toString('base64');
-      const ext = (audioFilePath.split('.').pop() || 'webm').toLowerCase();
-      const mimeType = MIME[ext] || 'audio/webm';
+      if (subtitleContent) {
+        // Path A: Subtitle formatter (very fast, accurate transcription)
+        logger.info('Transcribe', 'Enviando legendas obtidas para o Gemini...');
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: `Você é um formatador profissional de transcrições do UniStream Downloader.
+Recebemos este arquivo de legenda (VTT/SRT) do vídeo e precisamos de uma transcrição organizada, limpa e com pontuação correta em Português Brasileiro.
 
-      logger.info('Transcribe', `Enviando ${Math.round(audioBuffer.length / 1024)}KB para Gemini (${mimeType})...`);
+Título: ${mediaTitle}
+Canal: ${mediaAuthor}
+URL: ${url}
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { inlineData: { mimeType, data: base64Audio } },
-              {
-                text: `Você é um transcritor profissional de áudio e vídeo. Transcreva com precisão TUDO o que é dito neste áudio, em Português Brasileiro.
+Legendas:
+${subtitleContent.substring(0, 35000)}
 
-IMPORTANTE: Se a mídia for uma música (clipe, faixa de áudio, cover, etc.), além ou no lugar da transcrição fonética, você DEVE recuperar a LETRA OFICIAL COMPLETA (lyrics) da música na língua original (e tradução se apropriado) a partir do seu banco de dados de conhecimento global e colocá-la na seção de transcrição formatada de maneira limpa.
-
-Siga este formato (texto simples, sem markdown, sem blocos de código):
+Siga exatamente o formato abaixo (texto simples, sem markdown, sem blocos de código):
 
 ============= UNISTREAM TRANSCRIPTION SERVICE =============
 - Título: ${mediaTitle}
 - Canal/Autor: ${mediaAuthor}
 - URL: ${url}
-- Método: Transcrição Real de Áudio + Letra Oficial via Google Gemini AI
+- Método: Transcrição Otimizada de Legendas via Google Gemini IA (Fast Track)
 - Data: ${new Date().toLocaleDateString('pt-BR')}
 
 ============= RESUMO EXECUTIVO =============
-[Escreva 2-3 parágrafos resumindo a música ou o tema do áudio, seu significado, contexto de lançamento ou mensagem principal]
+[Escreva 2 parágrafos resumindo detalhadamente os temas, tópicos e conclusões do vídeo]
 
-============= LETRA DA MÚSICA / TRANSCRIÇÃO COMPLETA =============
-[Se for música: Coloque a letra oficial completa organizada por estrofes. Se for fala/podcast: Transcreva palavra por palavra tudo que foi dito com timestamps [MM:SS] a cada 30 segundos.]
+============= TRANSCRIÇÃO DETALHADA =============
+[Organize o texto das legendas acima em parágrafos coerentes, adicione pontuação correta (pontos, vírgulas, interrogações), corrija pequenos erros de ortografia fonética e insira timestamps [MM:SS] aproximados a cada início de tópico importante. Remova marcas repetitivas das legendas.]
 
 ============= PALAVRAS-CHAVE E DESTAQUES =============
-[Liste as 5-10 principais ideias, frases marcantes e conclusões do conteúdo]`
-              }
-            ]
-          }
-        ]
-      });
+[Liste as principais ideias ou frases do conteúdo]`
+        });
+        transcriptText = response.text?.trim() || '';
+      } else {
+        // Path B: Direct smart search / Lyrics retrieval
+        logger.info('Transcribe', 'Buscando letra/conteúdo do vídeo via IA...');
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: `Você é um assistente inteligente de transcrição do UniStream Downloader.
+Não conseguimos baixar as legendas diretamente. Precisamos que você gere a letra completa da música (se for música) ou um relatório e resumo estruturado do assunto abordado.
 
-      transcriptText = response.text?.trim() || '';
-      logger.info('Transcribe', `Transcrição real concluída (${transcriptText.length} chars).`);
-    } catch (geminiErr: any) {
-      logger.error('Transcribe', `Erro no Gemini: ${geminiErr.message}`);
-      transcriptText = buildErrorText(mediaTitle, mediaAuthor, url, geminiErr.message);
-    } finally {
-      cleanupFile(audioFilePath);
-    }
-  } else if (ai) {
-    // ── Path B: Fallback — text-only analysis (clearly labeled) ─────────────
-    logger.info('Transcribe', 'Áudio indisponível — gerando análise de conteúdo por metadados.');
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Você é um assistente inteligente. Analise a mídia abaixo com base nos metadados.
-        
-IMPORTANTE: Se a mídia for uma música conhecida (baseado no título e canal), você DEVE recuperar e fornecer a LETRA OFICIAL COMPLETA (lyrics) dessa música em vez de apenas simular uma análise.
+IMPORTANTE: Se o título/canal indicar que a mídia é uma MÚSICA (canção, clipe, faixa), você DEVE recuperar e fornecer a LETRA OFICIAL COMPLETA (lyrics) dessa música em seu banco de dados global de conhecimento.
 
 Título: ${mediaTitle}
 Canal: ${mediaAuthor}
 URL: ${url}
-Data: ${new Date().toLocaleDateString('pt-BR')}
 
-Formate em texto simples, sem markdown:
+Siga exatamente o formato abaixo (texto simples, sem markdown, sem blocos de código):
 
-============= UNISTREAM - ANÁLISE E LETRA POR IA =============
+============= UNISTREAM TRANSCRIPTION SERVICE =============
 - Título: ${mediaTitle}
-- Canal: ${mediaAuthor}
+- Canal/Autor: ${mediaAuthor}
 - URL: ${url}
+- Método: Recuperação Inteligente de Letra/Conteúdo via Google Gemini IA (Fast Track)
 - Data: ${new Date().toLocaleDateString('pt-BR')}
 
-============= SIGNIFICADO E RESUMO =============
-[Explique o contexto, autoria, gênero e o significado do vídeo ou da música]
+============= RESUMO / CONTEXTO =============
+[Se for música: Explique o significado da letra, estilo musical e recepção. Se for palestra/vídeo: Explique do que se trata o conteúdo com base no título e autor.]
 
 ============= LETRA OFICIAL / CONTEÚDO ESTIMADO =============
-[Se for música conhecida: Forneça a letra oficial completa e organizada. Se for outro tipo de conteúdo: Forneça um resumo detalhado estruturado do que é falado.]
+[Se for música: Coloque a letra oficial completa e organizada por estrofes. Se for outro tipo de conteúdo: Forneça um resumo detalhado estruturado do que é falado.]
 
 ============= TÓPICOS E DESTAQUES =============
 [Destaque as principais frases ou ideias da música/conteúdo]`
-      });
-      transcriptText = response.text?.trim() || 'Falha ao gerar análise.';
-    } catch {
-      transcriptText = buildErrorText(mediaTitle, mediaAuthor, url, 'Falha na análise de conteúdo');
+        });
+        transcriptText = response.text?.trim() || '';
+      }
+      logger.info('Transcribe', `Processamento concluído com sucesso (${transcriptText.length} caracteres).`);
+    } catch (geminiErr: any) {
+      logger.error('Transcribe', `Erro no Gemini: ${geminiErr.message}`);
+      transcriptText = buildErrorText(mediaTitle, mediaAuthor, url, geminiErr.message);
     }
   } else {
     transcriptText = `============= UNISTREAM TRANSCRIPTION SERVICE =============
