@@ -1,8 +1,10 @@
 import { Platform, MediaInfo, DownloadFormat } from '../types';
 
-const BASE_URL = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
-  ? 'https://unistreamdownloader.onrender.com'
-  : '';
+const BASE_URL = (import.meta as any).env.VITE_API_BASE || (
+  typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+    ? 'https://unistreamdownloader.onrender.com'
+    : ''
+);
 
 export const api = {
   /** POST /api/info — Extract metadata for a URL */

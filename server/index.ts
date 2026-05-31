@@ -9,6 +9,10 @@ import infoRouter from './routes/info.js';
 import downloadRouter from './routes/download.js';
 import mp3Router from './routes/mp3.js';
 import transcribeRouter from './routes/transcribe.js';
+import statusRouter from './routes/status.js';
+
+// Middleware
+import { infoRateLimit, downloadRateLimit, transcribeRateLimit } from './middleware/rateLimit.js';
 
 // Utils
 import { startAutoCleanup } from './utils/cleanup.js';
@@ -19,12 +23,15 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
+// Trust proxy (for rate limiting behind Render/Vercel)
+app.set('trust proxy', 1);
+
 // Middlewares
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Security headers (no popups, no redirects to external)
+// Security headers
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -45,17 +52,17 @@ app.use((req, res, next) => {
 });
 
 // ========================
-// New Organized API Routes
+// API Routes (with rate limiting)
 // ========================
-app.use('/api/info', infoRouter);
-app.use('/api/download', downloadRouter);
-app.use('/api/mp3', mp3Router);
-app.use('/api/transcribe', transcribeRouter);
+app.use('/api/status', statusRouter);
+app.use('/api/info', infoRateLimit, infoRouter);
+app.use('/api/download', downloadRateLimit, downloadRouter);
+app.use('/api/mp3', downloadRateLimit, mp3Router);
+app.use('/api/transcribe', transcribeRateLimit, transcribeRouter);
 
 // ========================
 // Legacy routes (kept for compatibility)
 // ========================
-// Import and mount the legacy server routes
 import '../server.js';
 
 // ========================
@@ -74,12 +81,12 @@ async function startServer() {
       maxAge: '1y',
       etag: true,
       setHeaders: (res, filePath) => {
-        // Don't cache index.html
         if (filePath.endsWith('index.html')) {
           res.setHeader('Cache-Control', 'no-cache');
         }
-      }
+      },
     }));
+    // SPA fallback — all frontend routes
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, Moon, Sun, Bell } from 'lucide-react';
+import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
+import { Download, Moon, Sun, Bell, Activity } from 'lucide-react';
 import './index.css';
 
 import { DownloadJob, DownloadFormat, MediaInfo } from './types';
@@ -12,12 +13,125 @@ import UrlInput from './components/UrlInput';
 import MediaPreview from './components/MediaPreview';
 import DownloadHistory from './components/DownloadHistory';
 import ToastNotifications from './components/ToastNotifications';
+import FooterNav from './components/FooterNav';
+import StatusPage from './components/StatusPage';
+import AboutPage from './pages/AboutPage';
+import PrivacyPage from './pages/PrivacyPage';
+import TermsPage from './pages/TermsPage';
+import ContactPage from './pages/ContactPage';
 
 // @ts-ignore
 import unistreamLogo from './assets/images/unistream_logo_1779851975537.png';
 
 const HISTORY_KEY = 'unistream_jobs_v2';
 
+// ── Shared Header ───────────────────────────────────────────────────────────
+function Header({ darkMode, onToggleDark, onRequestNotifications }: {
+  darkMode: boolean;
+  onToggleDark: () => void;
+  onRequestNotifications: () => void;
+}) {
+  const location = useLocation();
+  const isHome = location.pathname === '/';
+
+  const navLinks = [
+    { to: '/status', label: 'Status' },
+    { to: '/sobre', label: 'Sobre' },
+  ];
+
+  return (
+    <header className="header-blur" style={{ position: 'sticky', top: 0, zIndex: 100, padding: '12px 20px' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        {/* Logo */}
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+          <img src={unistreamLogo} alt="UniStream" style={{ height: 32, width: 32, borderRadius: 8 }} />
+          <div>
+            <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1rem' }} className="gradient-text">
+              UniStream
+            </span>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: 4 }}>Pro</span>
+          </div>
+        </Link>
+
+        {/* Nav links (hidden on mobile, visible on md+) */}
+        <nav className="header-nav">
+          {navLinks.map(link => (
+            <Link
+              key={link.to}
+              to={link.to}
+              className={`header-nav-link ${location.pathname === link.to ? 'header-nav-link-active' : ''}`}
+            >
+              {link.to === '/status' && <Activity size={13} />}
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button onClick={onRequestNotifications} className="btn btn-ghost btn-sm" title="Ativar notificações">
+            <Bell size={16} />
+          </button>
+          <button onClick={onToggleDark} className="btn btn-ghost btn-sm" title="Alternar tema">
+            {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          <Link to="/status" className="badge badge-emerald" style={{ fontSize: '0.7rem', textDecoration: 'none' }}>
+            🟢 Online
+          </Link>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+// ── Home Page ────────────────────────────────────────────────────────────────
+function HomePage({
+  jobs, analyzing, downloading, currentUrl, currentInfo,
+  onInfoLoaded, onError, setAnalyzing, onStartDownload,
+  onUpdateJob, onSaveJob, onDeleteJob, onToggleFavorite, onClearHistory, favorites,
+}: any) {
+  return (
+    <main style={{ paddingBottom: 40 }}>
+      <HeroSection />
+      <UrlInput
+        onInfoLoaded={onInfoLoaded}
+        onError={onError}
+        loading={analyzing}
+        setLoading={setAnalyzing}
+      />
+      {currentInfo && currentUrl && (
+        <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px' }}>
+          <MediaPreview
+            url={currentUrl}
+            info={currentInfo}
+            onStartDownload={onStartDownload}
+            downloading={downloading}
+          />
+        </div>
+      )}
+      <DownloadHistory
+        jobs={jobs}
+        onUpdate={onUpdateJob}
+        onSave={onSaveJob}
+        onDelete={onDeleteJob}
+        onToggleFavorite={onToggleFavorite}
+        onClear={onClearHistory}
+        favorites={favorites}
+      />
+    </main>
+  );
+}
+
+// ── Page Wrapper ─────────────────────────────────────────────────────────────
+function PageWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <main style={{ paddingBottom: 40, minHeight: 'calc(100vh - 200px)' }}>
+      {children}
+    </main>
+  );
+}
+
+// ── App Root ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [darkMode, setDarkMode] = useState(true);
   const [jobs, setJobs] = useState<DownloadJob[]>(() => {
@@ -27,7 +141,6 @@ export default function App() {
       return [];
     }
   });
-
   const [currentUrl, setCurrentUrl] = useState<string | null>(null);
   const [currentInfo, setCurrentInfo] = useState<MediaInfo | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -43,6 +156,7 @@ export default function App() {
 
   // Dark mode
   useEffect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
     if (darkMode) {
       document.documentElement.classList.add('dark');
     } else {
@@ -90,7 +204,6 @@ export default function App() {
       return;
     }
 
-    // Create job entry
     const jobId = crypto.randomUUID();
     const newJob: DownloadJob = {
       id: jobId,
@@ -132,7 +245,6 @@ export default function App() {
         });
       }
 
-      // Update job with server-assigned ID
       setJobs((prev) =>
         prev.map((j) => (j.id === jobId ? { ...j, id: result.jobId } : j))
       );
@@ -154,9 +266,7 @@ export default function App() {
     setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...updates } : j)));
 
     if (updates.status === 'done') {
-      toast.success('✅ Download concluído!', 'Baixando arquivo automaticamente...');
-
-      // Auto-download: dispara o download direto, sem precisar clicar em Salvar
+      toast.success('✅ Download concluído!', 'Arquivo validado e pronto para baixar.');
       if (updates.filePath) {
         const a = document.createElement('a');
         a.href = updates.filePath;
@@ -166,10 +276,9 @@ export default function App() {
         a.click();
         document.body.removeChild(a);
       }
-
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('✅ UniStream — Download concluído!', {
-          body: 'Seu arquivo está sendo baixado.',
+          body: 'Arquivo validado e sendo baixado.',
           icon: '/favicon.ico',
         });
       }
@@ -181,10 +290,8 @@ export default function App() {
       toast.error('Arquivo não disponível', 'O arquivo não está pronto ainda.');
       return;
     }
-
     const a = document.createElement('a');
-    const url = job.filePath.startsWith('http') ? job.filePath : job.filePath;
-    a.href = url;
+    a.href = job.filePath;
     a.download = job.filename || `${job.title}.${job.format}`;
     a.target = '_blank';
     document.body.appendChild(a);
@@ -216,97 +323,39 @@ export default function App() {
     }
   };
 
+  const homeProps = {
+    jobs, analyzing, downloading, currentUrl, currentInfo,
+    onInfoLoaded: handleInfoLoaded,
+    onError: handleError,
+    setAnalyzing,
+    onStartDownload: handleStartDownload,
+    onUpdateJob: handleUpdateJob,
+    onSaveJob: handleSaveJob,
+    onDeleteJob: handleDeleteJob,
+    onToggleFavorite: handleToggleFavorite,
+    onClearHistory: handleClearHistory,
+    favorites,
+  };
+
   return (
     <div style={{ minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
-      {/* Header */}
-      <header
-        className="header-blur"
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          padding: '12px 20px',
-        }}
-      >
-        <div style={{
-          maxWidth: 1100,
-          margin: '0 auto',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-          {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <img src={unistreamLogo} alt="UniStream" style={{ height: 32, width: 32, borderRadius: 8 }} />
-            <div>
-              <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1rem' }} className="gradient-text">
-                UniStream
-              </span>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: 4 }}>Pro</span>
-            </div>
-          </div>
+      <Header
+        darkMode={darkMode}
+        onToggleDark={() => setDarkMode((p) => !p)}
+        onRequestNotifications={requestNotifications}
+      />
 
-          {/* Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              onClick={requestNotifications}
-              className="btn btn-ghost btn-sm"
-              title="Ativar notificações"
-            >
-              <Bell size={16} />
-            </button>
-            <button
-              onClick={() => setDarkMode((prev) => !prev)}
-              className="btn btn-ghost btn-sm"
-              title="Alternar tema"
-            >
-              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
-            <div className="badge badge-emerald" style={{ fontSize: '0.7rem' }}>
-              🟢 Online
-            </div>
-          </div>
-        </div>
-      </header>
+      <Routes>
+        <Route path="/" element={<HomePage {...homeProps} />} />
+        <Route path="/status" element={<PageWrapper><StatusPage /></PageWrapper>} />
+        <Route path="/sobre" element={<PageWrapper><AboutPage /></PageWrapper>} />
+        <Route path="/privacidade" element={<PageWrapper><PrivacyPage /></PageWrapper>} />
+        <Route path="/termos" element={<PageWrapper><TermsPage /></PageWrapper>} />
+        <Route path="/contato" element={<PageWrapper><ContactPage /></PageWrapper>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
 
-      {/* Main content */}
-      <main style={{ paddingBottom: 40 }}>
-        {/* Hero */}
-        <HeroSection />
-
-        {/* URL Input */}
-        <UrlInput
-          onInfoLoaded={handleInfoLoaded}
-          onError={handleError}
-          loading={analyzing}
-          setLoading={setAnalyzing}
-        />
-
-        {/* Media Preview card */}
-        {currentInfo && currentUrl && (
-          <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px' }}>
-            <MediaPreview
-              url={currentUrl}
-              info={currentInfo}
-              onStartDownload={handleStartDownload}
-              downloading={downloading}
-            />
-          </div>
-        )}
-
-        {/* Download History */}
-        <DownloadHistory
-          jobs={jobs}
-          onUpdate={handleUpdateJob}
-          onSave={handleSaveJob}
-          onDelete={handleDeleteJob}
-          onToggleFavorite={handleToggleFavorite}
-          onClear={handleClearHistory}
-          favorites={favorites}
-        />
-      </main>
-
-      {/* Toast notifications */}
+      <FooterNav />
       <ToastNotifications toasts={toasts} onRemove={removeToast} />
     </div>
   );

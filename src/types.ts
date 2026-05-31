@@ -8,10 +8,11 @@ export type Platform =
   | 'kwai'
   | 'vimeo'
   | 'reddit'
-  | 'web';
+  | 'web'
+  | 'generic';
 
 export type DownloadFormat = 'mp4' | 'mp3' | 'txt';
-export type DownloadStatus = 'queued' | 'downloading' | 'converting' | 'finalizing' | 'done' | 'error';
+export type DownloadStatus = 'queued' | 'downloading' | 'converting' | 'validating' | 'finalizing' | 'done' | 'error';
 
 export interface FormatOption {
   id: string;
@@ -60,4 +61,11 @@ export interface ToastMessage {
   title: string;
   body?: string;
   duration?: number;
+}
+
+export interface LiveMetrics {
+  activeUsersNow: number;
+  downloadsTodayCount: number;
+  totalDataSavedBytes: number;
+  averageSpeedMbps: number;
 }

@@ -3,8 +3,8 @@ import fs from "fs";
 
 console.log("Starting dl...");
 const stream = youtubedl.exec("https://www.youtube.com/watch?v=H64QG4UsrGI", {
-  o: '-',
-  f: 'best',
+  output: '-',
+  format: 'best',
 });
 
 if (stream && stream.stdout) {

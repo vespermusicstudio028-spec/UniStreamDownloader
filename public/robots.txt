@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Allow: /sobre
+Allow: /status
+Allow: /termos
+Allow: /privacidade
+Allow: /contato
+
+# Disallow processing URLs or temporary folders
+Disallow: /api/
+Disallow: /tmp/
+
+Sitemap: https://unistream.pro/sitemap.xml

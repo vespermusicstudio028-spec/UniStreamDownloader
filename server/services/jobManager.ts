@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { logger } from '../utils/logger.js';
 
-export type JobStatus = 'queued' | 'downloading' | 'converting' | 'finalizing' | 'done' | 'error';
+export type JobStatus = 'queued' | 'downloading' | 'converting' | 'validating' | 'finalizing' | 'done' | 'error';
 
 export interface Job {
   id: string;
@@ -15,6 +15,15 @@ export interface Job {
   error?: string;
   createdAt: number;
   clients: Set<Response>;
+  // Audio/video metadata (populated after validation)
+  duration?: number;      // seconds
+  bitrate?: number;       // kbps
+  sampleRate?: number;    // Hz
+  channels?: number;
+  fileSize?: number;      // bytes
+  format?: string;
+  validationErrors?: string[];
+  convertedAt?: number;   // timestamp when done
 }
 
 const jobs = new Map<string, Job>();
@@ -67,9 +76,17 @@ function sendEvent(res: Response, job: Job) {
     speed: job.speed,
     eta: job.eta,
     message: job.message,
-    filePath: job.filePath,   // ← necessário para o auto-download no frontend
+    filePath: job.filePath,
     filename: job.filename,
     error: job.error,
+    // Audio metadata
+    duration: job.duration,
+    bitrate: job.bitrate,
+    sampleRate: job.sampleRate,
+    channels: job.channels,
+    fileSize: job.fileSize,
+    format: job.format,
+    convertedAt: job.convertedAt,
   });
   res.write(`data: ${data}\n\n`);
 }
@@ -102,3 +119,11 @@ export function cleanupExpiredJobs() {
 }
 
 setInterval(cleanupExpiredJobs, 10 * 60 * 1000); // every 10 min
+
+export function getActiveJobCount(): number {
+  let count = 0;
+  for (const job of jobs.values()) {
+    if (job.status !== 'done' && job.status !== 'error') count++;
+  }
+  return count;
+}
